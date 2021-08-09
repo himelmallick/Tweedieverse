@@ -41,6 +41,7 @@
 #' @param plot_heatmap Logical. If TRUE (default is FALSE), generate a heatmap of the (top \code{heatmap_first_n}) significant associations.
 #' @param plot_scatter Logical. If TRUE (default is FALSE), generate scatter/box plots of individual associations.
 #' @param heatmap_first_n In heatmap, plot top N features with significant associations (default is 50).
+#' @param reference The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).
 #'
 #' @importFrom grDevices colorRampPalette dev.off jpeg pdf
 #' @importFrom stats coef fitted as.formula na.exclude p.adjust plogis sd update
@@ -264,7 +265,8 @@ Tweedieverse <- function(input_features,
                          na.action = na.exclude,
                          plot_heatmap = FALSE,
                          plot_scatter = FALSE,
-                         heatmap_first_n = 50) {
+                         heatmap_first_n = 50,
+                         reference = NULL) {
   
   #################################
   # Specify all available options #
@@ -476,7 +478,7 @@ Tweedieverse <- function(input_features,
         "as columns and metadata samples as rows"
       ))
       # transpose data frame so samples are rows
-      data <- as.data.frame(t(data))
+      data <- type.convert(as.data.frame(t(data)))
       logging::logdebug("linked data so samples are rows")
     } else {
       samples_column_column <-
@@ -488,8 +490,8 @@ Tweedieverse <- function(input_features,
             "as columns and metadata samples as columns"
           )
         )
-        data <- as.data.frame(t(data))
-        metadata <- as.data.frame(t(metadata))
+        data <- type.convert(as.data.frame(t(data)))
+        metadata <- type.convert(as.data.frame(t(metadata)))
         logging::logdebug("linked data and metadata so samples are rows")
       } else {
         samples_row_column <-
@@ -501,7 +503,7 @@ Tweedieverse <- function(input_features,
               "as rows and metadata samples as columns"
             )
           )
-          metadata <- as.data.frame(t(metadata))
+          metadata <- type.convert(as.data.frame(t(metadata)))
           logging::logdebug("linked metadata so samples are rows")
         } else {
           logging::logerror(
@@ -570,6 +572,33 @@ Tweedieverse <- function(input_features,
   #########################################################
   # Filter data based on min abundance and min prevalence #
   #########################################################
+
+  # use ordered factor for variables with more than two levels
+  # find variables with more than two levels
+  if (is.null(reference)) {
+    reference <- ","
+  }
+  
+  for ( i in colnames(metadata) ) {
+    mlevels <- unique(na.omit(metadata[,i]))
+    numeric_levels <- grep('^-?[0-9.]+[eE+-]?', mlevels, value = T)
+    if ( ( length(mlevels[! (mlevels %in% c("UNK"))]) > 2 ) &&
+         #( i %in% fixed_effects ) &&
+         ( length(numeric_levels) == 0)) {
+      split_reference <- unlist(strsplit(reference, "[,;]"))
+      if (! i %in% split_reference ) {
+        stop(
+          paste("Please provide the reference for the variable '",
+                i, "' which includes more than 2 levels: ",
+                paste(as.character(mlevels), collapse=", "), ".", sep="")
+        )
+      } else {
+        ref <- split_reference[match(i,split_reference)+1]
+        other_levels <- as.character(mlevels)[! as.character(mlevels) == ref]
+        metadata[,i] = factor(metadata[,i], levels=c(ref, other_levels))
+      }
+    }
+  }
   
   unfiltered_data <- data
   unfiltered_metadata <- metadata
@@ -743,8 +772,8 @@ Tweedieverse <- function(input_features,
           )
         )
     )
-  
-  
+
+
   #############################################################
   # Standardize metadata (excpet the offset variable), if set #
   #############################################################
@@ -761,7 +790,8 @@ Tweedieverse <- function(input_features,
   # Merge metadata and offset back #
   ##################################
   
-  final_metadata <- cbind.data.frame(filtered_metadata, offset)
+  final_metadata <- as.data.frame(cbind.data.frame(filtered_metadata, offset))
+
   
   ##############################################################
   # Apply the base model to the filtered data with user inputs #
@@ -896,7 +926,7 @@ Tweedieverse <- function(input_features,
       output
     )
     association_plots(
-      final_metadata,
+      metadata,
       final_features,
       significant_results_file,
       output,

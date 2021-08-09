@@ -87,7 +87,7 @@ Tweedieverse_heatmap <-
              col_rotate = 90,
              first_n = 50,
              write_to = NA) {
-        # read MaAsLin output
+        # read Tweedieverse output
         df <- read.table(
             output_results,
             header = TRUE,
@@ -102,23 +102,23 @@ Tweedieverse_heatmap <-
         title_additional <- ""
         if (!is.na(first_n) & first_n > 0 & first_n < dim(df)[1]) {
             if (cell_value == 'coef') {
-                df <- df[order(-abs(df[cell_value])) ,]
+                df <- df[order(-abs(df[cell_value])) , ]
             } else{
-                df <- df[order(df[cell_value]),]
+                df <- df[order(df[cell_value]), ]
             }
             # get the top n features with significant associations
-            df_sub <- df[1:first_n, ]
+            df_sub <- df[1:first_n,]
             for (first_n_index in seq(first_n, dim(df)[1]))
             {
                 if (length(unique(df_sub$feature)) == first_n)
                 {
                     break
                 }
-                df_sub <- df[1:first_n_index, ]
+                df_sub <- df[1:first_n_index,]
             }
             # get all rows that have the top N features
-            df <- df[which(df$feature %in% df_sub$feature), ]
-            title_additional <- paste("Top", first_n, sep = " ")
+            df <- df[which(df$feature %in% df_sub$feature),]
+            title_additional <- paste("Top", first_n, sep=" ")
         }
         
         if (dim(df)[1] < 2) {
@@ -128,6 +128,7 @@ Tweedieverse_heatmap <-
         
         metadata <- df$metadata
         data <- df$feature
+        dfvalue <- df$value
         value <- NA
         
         # values to use for coloring the heatmap
@@ -148,26 +149,36 @@ Tweedieverse_heatmap <-
                 title <- "(coeff)"
         }
         
-        if (title_additional != "") {
-            title <-
-                paste(title_additional,
-                      "features with significant associations",
-                      title,
-                      sep = " ")
+        if (title_additional!="") {
+            title <- paste(title_additional, "features with significant associations", title, sep=" ")
         } else {
-            title <- paste("Significant associations", title, sep = " ")
+            title <- paste("Significant associations", title, sep=" ")
+        }
+        
+        # identify variables with more than one level present
+        verbose_metadata <- c()
+        metadata_multi_level <- c()
+        for (i in unique(metadata)) {
+            levels <- unique(df$value[df$metadata == i])
+            if (length(levels) > 1) {
+                metadata_multi_level <- c(metadata_multi_level, i)
+                for (j in levels) {
+                    verbose_metadata <- c(verbose_metadata, paste(i, j))
+                }
+            } else {
+                verbose_metadata <- c(verbose_metadata, i)
+            }
         }
         
         n <- length(unique(data))
-        m <- length(unique(metadata))
+        m <- length(unique(verbose_metadata))
         
         if (n < 2) {
             print(
                 paste(
                     "There is not enough features in the associations",
                     "to create a heatmap plot.",
-                    "Please review the associations in text output file."
-                )
+                    "Please review the associations in text output file.")
             )
             return(NULL)
         }
@@ -177,8 +188,7 @@ Tweedieverse_heatmap <-
                 paste(
                     "There is not enough metadata in the associations",
                     "to create a heatmap plot.",
-                    "Please review the associations in text output file."
-                )
+                    "Please review the associations in text output file.")
             )
             return(NULL)
         }
@@ -187,20 +197,24 @@ Tweedieverse_heatmap <-
         a <- as.data.frame(a)
         
         rownames(a) <- unique(data)
-        colnames(a) <- unique(metadata)
+        colnames(a) <- unique(verbose_metadata)
+        
         for (i in seq_len(dim(df)[1])) {
-            if (abs(a[as.character(data[i]),
-                      as.character(metadata[i])]) > abs(value[i]))
+            current_metadata <- metadata[i]
+            if (current_metadata %in% metadata_multi_level) {
+                current_metadata <- paste(metadata[i], dfvalue[i])
+            }
+            if (abs(a[as.character(data[i]), 
+                      as.character(current_metadata)]) > abs(value[i]))
                 next
-            a[as.character(data[i]), as.character(metadata[i])] <-
-                value[i]
+            a[as.character(data[i]), as.character(current_metadata)] <- value[i]
         }
         
         # get the range for the colorbar
         max_value <- ceiling(max(a))
         min_value <- ceiling(min(a))
-        range_value <- max(c(abs(max_value), abs(min_value)))
-        breaks <- seq(-1 * range_value, range_value, by = 1)
+        range_value <- max(c(abs(max_value),abs(min_value)))
+        breaks <- seq(-1*range_value, range_value, by = 1)
         
         p <- NULL
         tryCatch({
@@ -223,13 +237,12 @@ Tweedieverse_heatmap <-
                     clustering_distance_cols = "euclidean",
                     legend = TRUE,
                     border_color = border_color,
-                    color = color(range_value * 2),
+                    color = color(range_value*2),
                     breaks = breaks,
                     treeheight_row = 0,
                     treeheight_col = 0,
-                    display_numbers = matrix(ifelse(a > 0.0, "+", ifelse(
-                        a < 0.0, "-", ""
-                    )), nrow(a))
+                    display_numbers = matrix(ifelse(
+                        a > 0.0, "+", ifelse(a < 0.0, "-", "")), nrow(a))
                 )
         }, error = function(err) {
             logging::logerror("Unable to plot heatmap")
@@ -292,7 +305,7 @@ association_plots <-
         #Tweedieverse scatter plot function and theme
         
         # combine the data and metadata to one datframe using common rows
-        # read MaAsLin output
+        # read Tweedieverse output
         if (is.character(features)) {
             features <-
                 data.frame(
@@ -346,7 +359,7 @@ association_plots <-
             cbind(features[common_rows, , drop = FALSE],
                   metadata[common_rows, , drop = FALSE])
         
-        # read MaAsLin output
+        # read Tweedieverse output
         if (is.character(output_results)) {
             output_df_all <- read.table(
                 output_results,
@@ -472,32 +485,36 @@ association_plots <-
                     # if Metadata is categorical generate a boxplot
                     ### check if the variable is categorical
                     
-                    logging::loginfo("Creating boxplot for categorical data, %s vs %s",
-                                     x_label,
-                                     y_label)
-                    input_df['x'] <-
-                        lapply(input_df['x'], as.character)
+                    logging::loginfo(
+                        "Creating boxplot for categorical data, %s vs %s",
+                        x_label,
+                        y_label)
+                    input_df['x'] <- lapply(input_df['x'], as.character)
                     
                     # count the Ns for each group
                     x_axis_label_names <- unique(input_df[['x']])
+                    renamed_levels <- as.character(levels(metadata[,x_label]))
+                    if (length(renamed_levels) == 0) {
+                        renamed_levels <- x_axis_label_names
+                    }
                     for (name in x_axis_label_names) {
                         total <- length(which(input_df[['x']] == name))
-                        new_n <-
-                            paste(name, " (n=", total, ")", sep = "")
-                        input_df[which(input_df[['x']] == name), 'x'] <-
-                            new_n
+                        new_n <- paste(name, " (n=", total, ")", sep="")
+                        input_df[which(input_df[['x']] == name),'x'] <- new_n
+                        renamed_levels <- replace(renamed_levels, renamed_levels == name, new_n)
                     }
+                    input_df$xnames <- factor(input_df[['x']], levels=renamed_levels)
                     temp_plot <-
-                        ggplot2::ggplot(data = input_df, ggplot2::aes(factor(x), y)) +
+                        ggplot2::ggplot(data = input_df, ggplot2::aes(xnames, y)) +
                         ggplot2::geom_boxplot(
-                            ggplot2::aes(fill = x),
+                            ggplot2::aes(fill = xnames),
                             outlier.alpha = 0.0,
                             na.rm = TRUE,
                             alpha = .5,
                             show.legend = FALSE
                         ) +
                         ggplot2::geom_point(
-                            ggplot2::aes(fill = x),
+                            ggplot2::aes(fill = xnames),
                             alpha = 0.75 ,
                             size = 1,
                             shape = 21,

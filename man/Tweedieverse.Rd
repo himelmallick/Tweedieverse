@@ -27,7 +27,8 @@ Tweedieverse(
   na.action = na.exclude,
   plot_heatmap = FALSE,
   plot_scatter = FALSE,
-  heatmap_first_n = 50
+  heatmap_first_n = 50,
+  reference = NULL
 )
 }
 \arguments{
@@ -93,6 +94,8 @@ Ignored for random effects modeling which uses an alternative Template Model Bui
 \item{plot_scatter}{Logical. If TRUE (default is FALSE), generate scatter/box plots of individual associations.}
 
 \item{heatmap_first_n}{In heatmap, plot top N features with significant associations (default is 50).}
+
+\item{reference}{The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).}
 }
 \value{
 A data frame containing coefficient estimates, p-values, and q-values (multiplicity-adjusted p-values) are returned.
@@ -290,8 +293,10 @@ standardize = FALSE)
 
 }
 }
+
 \author{
-Himel Mallick, \email{himel.mallick@merck.com}
+Himel Mallick, \email{himel.mallick@merck.com};
+Ali Rahnavard, \email{rahnavard@gwu.edu}
 }
 \keyword{metagenomics,}
 \keyword{microbiome,}

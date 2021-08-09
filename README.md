@@ -1,6 +1,6 @@
 Tweedieverse: Differential analysis of omics data based on the Tweedie distribution
 ================
-Himel Mallick
+Himel Mallick, Ali Rahnavard
 2021-06-28 <img src="docs/logo.jpg" align="right" width="365px"/>
 
 -   [Introduction](#introduction)
