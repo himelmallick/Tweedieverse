@@ -450,8 +450,9 @@ association_plots <-
                             color = 'black',
                             alpha = .5,
                             shape = 21,
-                            size = 3,
-                            stroke = 0.5
+                            size = 1,
+                            stroke = 0.15
+                            
                         ) +
                         ggplot2::scale_x_continuous(limits = c(min(input_df['x']), max(input_df['x']))) +
                         ggplot2::scale_y_continuous(limits = c(min(input_df['y']), max(input_df['y']))) +
