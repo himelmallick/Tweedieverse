@@ -2,7 +2,7 @@
 % Please edit documentation in R/Tweedieverse.R
 \name{Tweedieverse}
 \alias{Tweedieverse}
-\title{Multi-omics Differential Analysis with Tweedie GLMs}
+\title{Differential analysis of multi-omics data using Tweedie GLMs}
 \usage{
 Tweedieverse(
   input_features,
@@ -33,11 +33,21 @@ Tweedieverse(
 )
 }
 \arguments{
-\item{input_features}{A tab-delimited input file or an R data frame of features (rows/columns).
-Samples are expected to have matching sample names with \code{input_metadata}.}
+\item{input_features}{A tab-delimited input file or an R data frame of features (can be in rows/columns)
+and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
+\code{input_features} can also be an object of class \code{SummarizedExperiment} or \code{SingleCellExperiment} 
+that contains the expression or abundance matrix and other metadata; the \code{assays} 
+slot contains the expression or abundance matrix and is named \code{"counts"}.  
+This matrix should have one row for each feature and one sample for each column.  
+The \code{colData} slot should contain a data frame with one row per 
+sample and columns that contain metadata for each sample. 
+Additional information about the experiment can be contained in the
+\code{metadata} slot as a list.}
 
 \item{input_metadata}{A tab-delimited input file or an R data frame of metadata (rows/columns).
-Samples are expected to have matching sample names with \code{input_features}.}
+Samples are expected to have matching sample names with \code{input_features}. 
+This file is ignored when \code{input_features} is a \code{SummarizedExperiment} 
+or a \code{SingleCellExperiment} object with \code{colData} containing the same information.}
 
 \item{output}{The output folder to write results.}
 
@@ -260,11 +270,11 @@ cores = 4)
 ##########################################################################
 
 ######################
-# HMP2 Data Analysis #
+# HMP2 input_features Analysis #
 ######################
 
 #############
-# Load Data #
+# Load input_features #
 #############
 
 library(data.table)

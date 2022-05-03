@@ -53,7 +53,7 @@ fit.ZACP <- function(features,
       })
       
       fitB <- tryCatch({
-        fit1 <- cplm::zcpglm(
+        fit1 <- zcpglm(
           formula = formula,
           data = data,
           link = link,

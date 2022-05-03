@@ -1,10 +1,21 @@
-#' Multi-omics Differential Analysis with Tweedie GLMs
+#' Differential analysis of multi-omics data using Tweedie GLMs
 #'
 #' Fit a per-feature Tweedie generalized linear model to omics features.
-#' @param input_features A tab-delimited input file or an R data frame of features (rows/columns).
-#' Samples are expected to have matching sample names with \code{input_metadata}.
+
+#' @param input_features A tab-delimited input file or an R data frame of features (can be in rows/columns)
+#' and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
+#' \code{input_features} can also be an object of class \code{SummarizedExperiment} or \code{SingleCellExperiment} 
+#' that contains the expression or abundance matrix and other metadata; the \code{assays} 
+#' slot contains the expression or abundance matrix and is named \code{"counts"}.  
+#' This matrix should have one row for each feature and one sample for each column.  
+#' The \code{colData} slot should contain a data frame with one row per 
+#' sample and columns that contain metadata for each sample. 
+#' Additional information about the experiment can be contained in the
+#' \code{metadata} slot as a list.
 #' @param input_metadata A tab-delimited input file or an R data frame of metadata (rows/columns).
-#' Samples are expected to have matching sample names with \code{input_features}.
+#' Samples are expected to have matching sample names with \code{input_features}. 
+#' This file is ignored when \code{input_features} is a \code{SummarizedExperiment} 
+#' or a \code{SingleCellExperiment} object with \code{colData} containing the same information.
 #' @param output The output folder to write results.
 #' @param abd_threshold If prevalence-abundance filtering is desired, only features that are present (or detected)
 #' in at least \code{prev_threshold} percent of samples at \code{abd_threshold} minimum abundance (read count or proportion)
@@ -207,11 +218,11 @@
 #' ##########################################################################
 #'
 #' ######################
-#' # HMP2 Data Analysis #
+#' # HMP2 input_features Analysis #
 #' ######################
 #'
 #' #############
-#' # Load Data #
+#' # Load input_features #
 #' #############
 #' 
 #' library(data.table)
@@ -283,59 +294,79 @@ Tweedieverse <- function(input_features,
     c("BH", "holm", "hochberg", "hommel", "bonferroni", "BY")
   optimizer_choices <- c("nlminb", "bobyqa", "L-BFGS-B")
   
-  #################################################################
-  # Read in the data and metadata, create output folder, init log #
-  #################################################################
-  # if a character string then this is a file name, else it
-  # is a data frame
-  if (is.character(input_features)) {
-    data <-
-      data.frame(
-        read.delim::fread(input_features, header = TRUE, sep = '\t'),
-        header = TRUE,
-        fill = T,
-        comment.char = "" ,
-        check.names = F,
-        row.names = 1
-      )
-    if (nrow(data) == 1) {
-      # read again to get row name
-      data <- read.delim(
-        input_features,
-        header = TRUE,
-        fill = T,
-        comment.char = "" ,
-        check.names = F,
-        row.names = 1
-      )
-    }
-  } else {
-    data <- input_features
-  }
-  if (is.character(input_metadata)) {
-    metadata <-
-      data.frame(
-        read.delim::fread(input_metadata, header = TRUE, sep = '\t'),
-        header = TRUE,
-        fill = T,
-        comment.char = "" ,
-        check.names = F,
-        row.names = 1
-      )
-    if (nrow(metadata) == 1) {
-      metadata <- read.delim(
-        input_metadata,
-        header = TRUE,
-        fill = T,
-        comment.char = "" ,
-        check.names = F,
-        row.names = 1
-      )
-    }
-  } else {
-    metadata <- input_metadata
-  }
+  #######################################################################
+  #=====================================================================#
+  # Read in the data and metadata, create output folder, initialize log #
+  #=====================================================================#
+  #######################################################################
   
+  ##############################################################
+  # Extract features and metadata based on user-provided input #
+  ##############################################################
+  
+  if (!(methods::is(input_features, "SummarizedExperiment")) & !(methods::is(input_features, "SingleCellExperiment")) & !(is.character(input_features)) & !(is.data.frame(input_features))) {
+    stop(cat(paste('Input data of class <',class(input_features), '> not supported. Please use either SummarizedExperiment or SingleCellExperiment or data.frame')))
+  } else if (methods::is(input_features, "SummarizedExperiment") | methods::is(input_features, "SingleCellExperiment")) {
+    SumExp <- methods::as(input_features, "SummarizedExperiment")
+    data <- assay(SumExp); metadata <- as(colData(SumExp),"data.frame")
+      if (is.null(SummarizedExperiment::assayNames(SumExp)) || SummarizedExperiment::assayNames(SumExp)[1] != "counts") {
+        message("Renaming the first element in assays(input_features) to 'counts'")
+        SummarizedExperiment::assayNames(SumExp)[1] <- "counts"
+        if (is.null(colnames(counts(SumExp)))) {stop("Must supply sample/cell names!")}
+        }
+  } else{
+    
+    # if a character string then this is a file name, else it
+    # is a data frame
+    if (is.character(input_features)) {
+      data <-
+        data.frame(
+          read.delim::fread(input_features, header = TRUE, sep = '\t'),
+          header = TRUE,
+          fill = T,
+          comment.char = "" ,
+          check.names = F,
+          row.names = 1
+        )
+      if (nrow(input_features) == 1) {
+        # read again to get row name
+        data <- read.delim(
+          input_features,
+          header = TRUE,
+          fill = T,
+          comment.char = "" ,
+          check.names = F,
+          row.names = 1
+        )
+      }
+    } else {
+      data <- input_features
+    }
+    if (is.character(input_metadata)) {
+      input_metadata <-
+        data.frame(
+          read.delim::fread(input_metadata, header = TRUE, sep = '\t'),
+          header = TRUE,
+          fill = T,
+          comment.char = "" ,
+          check.names = F,
+          row.names = 1
+        )
+      if (nrow(input_metadata) == 1) {
+        input_metadata <- read.delim(
+          input_metadata,
+          header = TRUE,
+          fill = T,
+          comment.char = "" ,
+          check.names = F,
+          row.names = 1
+        )
+      }
+    } else {
+      metadata <- input_metadata
+    }
+  }
+    
   # create an output folder and figures folder if it does not exist
   if (!file.exists(output)) {
     print("Creating output folder")
@@ -517,9 +548,9 @@ Tweedieverse <- function(input_features,
               "Rows/columns do not match."
             )
           )
-          logging::logdebug("Data rows: %s",
+          logging::logdebug("input_features rows: %s",
                             paste(rownames(data), collapse = ","))
-          logging::logdebug("Data columns: %s",
+          logging::logdebug("input_features columns: %s",
                             paste(colnames(data), collapse = ","))
           logging::logdebug("Metadata rows: %s",
                             paste(rownames(metadata), collapse = ","))
@@ -817,7 +848,6 @@ Tweedieverse <- function(input_features,
         )
     )
 
-
   #############################################################
   # Standardize metadata (excpet the offset variable), if set #
   #############################################################
@@ -835,7 +865,6 @@ Tweedieverse <- function(input_features,
   ##################################
   
   final_metadata <- as.data.frame(cbind.data.frame(filtered_metadata, offset))
-
   
   ##############################################################
   # Apply the base model to the filtered data with user inputs #

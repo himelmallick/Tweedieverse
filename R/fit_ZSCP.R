@@ -44,7 +44,7 @@ fit.ZSCP <- function(features,
                )
              ),
              return(
-               cplm::zcpglm(
+               zcpglm(
                  formula = formula,
                  data = data,
                  link = link,

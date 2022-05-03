@@ -24,7 +24,7 @@ fit.ZICP <- function(features,
                                optimizer,
                                na.action) {
       return(
-        cplm::zcpglm(
+        zcpglm(
           formula = formula,
           data = data,
           link = link,
