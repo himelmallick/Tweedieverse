@@ -994,6 +994,16 @@ Tweedieverse <- function(input_features,
       logging::logerror(err)
     })
   }
+  logging::loginfo("Writing Tweedie inxed plot to file: %s",
+                   output)
+  tryCatch({
+    tweedie_index_plot(ordered_results, figures_folder)
+    
+  }, error = function(err) {
+    dev.off()
+    logging::logerror("Unable to do make a hetamp of results!!!")
+    logging::logerror(err)
+  })
   
   if (plot_scatter) {
     logging::loginfo(
