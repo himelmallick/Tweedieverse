@@ -85,7 +85,7 @@ Citation
 
 To cite **`Tweedieverse`** in publications, please use:
 
-Mallick H et al. (2021). [Differential Expression of Single-cell RNA-seq Data using Tweedie Models](https://www.biorxiv.org/content/10.1101/2021.03.28.437378v1). bioRxiv, <https://doi.org/10.1101/2021.03.28.437378>.
+Mallick, H, Chatterjee, S, Chowdhury, S, Chatterjee, S, Rahnavard, A, Hicks, SC. [Differential expression of single-cell RNA-seq data using Tweedie models](https://onlinelibrary.wiley.com/doi/10.1002/sim.9430). Statistics in Medicine. 2022; 41( 18): 3492- 3510. doi:10.1002/sim.9430
 
 To cite the **`Tweedieverse`** software, please use:
 
