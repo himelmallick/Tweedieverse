@@ -1016,7 +1016,7 @@ Tweedieverse <- function(input_features,
     )
     association_plots(
       metadata,
-      final_features,
+      final_features/offset,
       significant_results_file,
       output,
       figures_folder

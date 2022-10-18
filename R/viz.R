@@ -488,7 +488,7 @@ association_plots <-
               color = "black",
               size = 2,
               fontface = "italic"
-            )
+            ) + scale_y_log10()
         } else{
           # if Metadata is categorical generate a boxplot
           ### check if the variable is categorical
@@ -567,7 +567,7 @@ association_plots <-
               color = "black",
               size = 2,
               fontface = "italic"
-            )
+            ) + scale_y_log10()
         }
         stdout <-
           capture.output(print(temp_plot), type = "message")
