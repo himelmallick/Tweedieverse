@@ -373,13 +373,13 @@ Tweedieverse <- function(input_features,
     dir.create(output)
   }
   
-  if (plot_heatmap || plot_scatter) {
-    figures_folder <- file.path(output, "figures")
-    if (!file.exists(figures_folder)) {
-      print("Creating output figures folder")
-      dir.create(figures_folder)
-    }
+  #if (plot_heatmap || plot_scatter) {
+  figures_folder <- file.path(output, "figures")
+  if (!file.exists(figures_folder)) {
+    print("Creating output figures folder")
+    dir.create(figures_folder)
   }
+  #}
  
   # Create log file (write info to stdout and debug level to log file)
   # Set level to finest so all log levels are reviewed
@@ -979,6 +979,17 @@ Tweedieverse <- function(input_features,
   # Create visualizations for results passing threshold #
   #######################################################
   
+  logging::loginfo("Writing Tweedie inxed plot to file: %s",
+                   output)
+  tryCatch({
+    tweedie_index_plot(ordered_results, figures_folder)
+    
+  }, error = function(err) {
+    logging::logerror("Unable to do make a Tweedie inxed plot of results!!!")
+    logging::logerror(err)
+    # dev.off()
+  })
+  
   if (plot_heatmap & length(unique(significant_results_file["metdata"])) > 1) {
     heatmap_file <- file.path(output, "Tweedieverse_Heatmap.pdf")
     logging::loginfo("Writing heatmap of significant results to file: %s",
@@ -994,16 +1005,6 @@ Tweedieverse <- function(input_features,
       # dev.off()
     })
   }
-  logging::loginfo("Writing Tweedie inxed plot to file: %s",
-                   output)
-  tryCatch({
-    tweedie_index_plot(ordered_results, figures_folder)
-    
-  }, error = function(err) {
-    logging::logerror("Unable to do make a Tweedie inxed plot of results!!!")
-    logging::logerror(err)
-    # dev.off()
-  })
   
   if (plot_scatter) {
     logging::loginfo(
