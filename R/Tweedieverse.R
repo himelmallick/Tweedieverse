@@ -989,9 +989,9 @@ Tweedieverse <- function(input_features,
                    figures_folder,
                    first_n = heatmap_first_n)
     }, error = function(err) {
-      dev.off()
       logging::logerror("Unable to do make a hetamp of results!!!")
       logging::logerror(err)
+      # dev.off()
     })
   }
   logging::loginfo("Writing Tweedie inxed plot to file: %s",
@@ -1000,9 +1000,9 @@ Tweedieverse <- function(input_features,
     tweedie_index_plot(ordered_results, figures_folder)
     
   }, error = function(err) {
-    dev.off()
-    logging::logerror("Unable to do make a hetamp of results!!!")
+    logging::logerror("Unable to do make a Tweedie inxed plot of results!!!")
     logging::logerror(err)
+    # dev.off()
   })
   
   if (plot_scatter) {
