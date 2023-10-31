@@ -101,9 +101,9 @@ Tweedieverse_heatmap <-
     } else {
       data <- output_results
     }
-    
+
     title_additional <- ""
-    
+
     title_additional <- ""
     if (!is.na(first_n) & first_n > 0 & first_n < dim(df)[1]) {
       if (cell_value == 'coef') {
@@ -125,17 +125,17 @@ Tweedieverse_heatmap <-
       df <- df[which(df$feature %in% df_sub$feature), ]
       title_additional <- paste("Top", first_n, sep = " ")
     }
-    
+
     if (dim(df)[1] < 2) {
       print('There are no associations to plot!')
       return(NULL)
     }
-    
+
     metadata <- df$metadata
     data <- df$feature
     dfvalue <- df$value
     value <- NA
-    
+
     # values to use for coloring the heatmap
     # and set the colorbar boundaries
     if (cell_value == "pval") {
@@ -153,7 +153,7 @@ Tweedieverse_heatmap <-
       if (is.null(title))
         title <- "(coeff)"
     }
-    
+
     if (title_additional != "") {
       title <-
         paste(title_additional,
@@ -163,7 +163,7 @@ Tweedieverse_heatmap <-
     } else {
       title <- paste("Significant associations", title, sep = " ")
     }
-    
+
     # identify variables with more than one level present
     verbose_metadata <- c()
     metadata_multi_level <- c()
@@ -178,10 +178,10 @@ Tweedieverse_heatmap <-
         verbose_metadata <- c(verbose_metadata, i)
       }
     }
-    
+
     n <- length(unique(data))
     m <- length(unique(verbose_metadata))
-    
+
     if (n < 2) {
       print(
         paste(
@@ -192,7 +192,7 @@ Tweedieverse_heatmap <-
       )
       return(NULL)
     }
-    
+
     if (m < 2) {
       print(
         paste(
@@ -203,13 +203,13 @@ Tweedieverse_heatmap <-
       )
       return(NULL)
     }
-    
+
     a = matrix(0, nrow = n, ncol = m)
     a <- as.data.frame(a)
-    
+
     rownames(a) <- unique(data)
     colnames(a) <- unique(verbose_metadata)
-    
+
     for (i in seq_len(dim(df)[1])) {
       current_metadata <- metadata[i]
       if (current_metadata %in% metadata_multi_level) {
@@ -221,13 +221,13 @@ Tweedieverse_heatmap <-
       a[as.character(data[i]), as.character(current_metadata)] <-
         value[i]
     }
-    
+
     # get the range for the colorbar
     max_value <- ceiling(max(a))
     min_value <- ceiling(min(a))
     range_value <- max(c(abs(max_value), abs(min_value)))
     breaks <- seq(-1 * range_value, range_value, by = 1)
-    
+
     p <- NULL
     tryCatch({
       p <-
@@ -288,12 +288,12 @@ save_heatmap <-
         first_n,
         figures_folder
       )
-    
+
     if (!is.null(heatmap)) {
       pdf(heatmap_file)
       print(heatmap)
       dev.off()
-      
+
       jpg_file <- file.path(figures_folder, "heatmap.jpg")
       jpeg(jpg_file,
            res = 150,
@@ -302,7 +302,7 @@ save_heatmap <-
       print(heatmap)
       dev.off()
     }
-    
+
   }
 
 association_plots <-
@@ -314,7 +314,7 @@ association_plots <-
            max_jpgs = 3)
   {
     #Tweedieverse scatter plot function and theme
-    
+
     # combine the data and metadata to one datframe using common rows
     # read Tweedieverse output
     if (is.character(features)) {
@@ -369,7 +369,7 @@ association_plots <-
     input_df_all <-
       cbind(features[common_rows, , drop = FALSE],
             metadata[common_rows, , drop = FALSE])
-    
+
     # read Tweedieverse output
     if (is.character(output_results)) {
       output_df_all <- read.table(
@@ -384,12 +384,12 @@ association_plots <-
     } else {
       output_df_all <- output_results
     }
-    
+
     if (dim(output_df_all)[1] < 1) {
       print('There are no associations to plot!')
       return(NULL)
     }
-    
+
     logging::loginfo(
       paste(
         "Plotting associations from most",
@@ -421,7 +421,7 @@ association_plots <-
           width = 2.65,
           height = 2.5,
           onefile = TRUE)
-      
+
       x <- NULL
       y <- NULL
       count <- 1
@@ -434,7 +434,7 @@ association_plots <-
         coef_val <- as.numeric(output_df_all[i, 'coef'])
         input_df <- input_df_all[c(x_label, y_label)]
         colnames(input_df) <- c("x", "y")
-        
+
         # if Metadata is continuous generate a scatter plot
         # Continuous is defined as numerical with more than
         # 2 values (to exclude binary data)
@@ -456,7 +456,7 @@ association_plots <-
               shape = 21,
               size = 1,
               stroke = 0.15
-              
+
             ) +
             ggplot2::scale_x_continuous(limits = c(min(input_df['x']), max(input_df['x']))) +
             ggplot2::scale_y_continuous(limits = c(min(input_df['y']), max(input_df['y']))) +
@@ -488,17 +488,17 @@ association_plots <-
               color = "black",
               size = 2,
               fontface = "italic"
-            ) + scale_y_log10()
+            ) + ggplot2::scale_y_log10()
         } else{
           # if Metadata is categorical generate a boxplot
           ### check if the variable is categorical
-          
+
           logging::loginfo("Creating boxplot for categorical data, %s vs %s",
                            x_label,
                            y_label)
           input_df['x'] <-
             lapply(input_df['x'], as.character)
-          
+
           # count the Ns for each group
           x_axis_label_names <- unique(input_df[['x']])
           renamed_levels <-
@@ -537,7 +537,7 @@ association_plots <-
               position = ggplot2::position_jitterdodge()
             ) +
             ggplot2::scale_fill_brewer(palette = "Spectral", direction = -1)
-          
+
           # format the figure to default nature format
           # remove legend, add x/y labels
           temp_plot <- temp_plot +
@@ -567,7 +567,7 @@ association_plots <-
               color = "black",
               size = 2,
               fontface = "italic"
-            ) + scale_y_log10()
+            ) + ggplot2::scale_y_log10()
         }
         stdout <-
           capture.output(print(temp_plot), type = "message")
@@ -578,7 +578,7 @@ association_plots <-
         saved_ggs[[count]] <- temp_plot
         count <- count + 1
       }
-      
+
       dev.off()
       # print the saved figures
       for (plot_number in seq(1, max_jpgs)) {
@@ -605,7 +605,7 @@ association_plots <-
                            sep = ""))
       metadata_number <- metadata_number + 1
     }
-    
+
   }
 
 tweedie_index_plot <-
@@ -626,34 +626,34 @@ tweedie_index_plot <-
     } else {
       output_df_all <- output_results
     }
-    
+
     if (dim(output_df_all)[1] < 1) {
       print('There are no associations to plot!')
       return(NULL)
     }
-    
+
     logging::loginfo(paste("Plotting tweedie.index ",
                            "colored by metadata"))
     plot_file <-
       paste(figures_folder,
             "/tweedie_index_plot.pdf",
             sep = "")
-    
+
     logging::loginfo("Plotting tweedie.index")
     pdf(plot_file,
         width = 2.65,
         height = 1.5,
         onefile = TRUE)
-    
+
     temp_plot <- NULL
-    
+
     temp_plot <- ggplot2::ggplot(output_df_all,aes(x=tweedie.index))+
       ggplot2::geom_histogram(position = "identity", alpha = 0.8)  +
       ggplot2::xlab("Tweedie index") + ggplot2::ylab("Number of omics features") +
-      ggplot2::theme_set(theme_omicsEye()) + 
+      ggplot2::theme_set(theme_omicsEye()) +
       ggplot2::theme(legend.justification = c(0, 0),
                      legend.position = c(.3, .5))
-    
+
     # print the saved figures
     tdout <-
       capture.output(print(temp_plot), type = "message")
@@ -672,5 +672,5 @@ tweedie_index_plot <-
             file = paste(figures_folder,
                          "/gg_tweedie_index_plot.RDS",
                          sep = ""))
-    
+
   }
