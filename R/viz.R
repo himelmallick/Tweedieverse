@@ -34,7 +34,7 @@ for (lib in c('ggplot2', "grid", 'pheatmap')) {
 }
 
 # Tweedieverse theme based on Nature journal requirements
-nature_theme <- function(x_axis_labels, y_label) {
+theme_omicsEye <- function(x_axis_labels, y_label) {
   # set default text format based on categorical and length
   angle = NULL
   hjust = NULL
@@ -647,7 +647,8 @@ tweedie_index_plot <-
 
     temp_plot <- NULL
 
-    temp_plot <- ggplot2::ggplot(output_df_all,aes(x=tweedie.index))+
+    temp_plot <- ggplot2::ggplot(output_df_all,
+      ggplot2::aes(x=tweedie.index))+
       ggplot2::geom_histogram(position = "identity", alpha = 0.8)  +
       ggplot2::xlab("Tweedie index") + ggplot2::ylab("Number of omics features") +
       ggplot2::theme_set(theme_omicsEye()) +
