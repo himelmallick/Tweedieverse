@@ -29,7 +29,7 @@
 #  Visualization results are provided as pdf and RDS format to be used with manuscript quality.
 
 # Load libraries
-for (lib in c('ggplot2', "grid", 'pheatmap')) {
+for (lib in c('ggplot2', "grid", 'pheatmap', 'cowplot')) {
   suppressPackageStartupMessages(require(lib, character.only = TRUE))
 }
 
