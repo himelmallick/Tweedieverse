@@ -33,46 +33,40 @@ for (lib in c('ggplot2', "grid", 'pheatmap', 'cowplot')) {
   suppressPackageStartupMessages(require(lib, character.only = TRUE))
 }
 
-# Tweedieverse theme based on Nature journal requirements
-theme_omicsEye <- function(x_axis_labels, y_label) {
-  # set default text format based on categorical and length
-  angle = NULL
-  hjust = NULL
-  size = 7
-  if (max(nchar(x_axis_labels), na.rm = TRUE) > 5) {
-    angle = 45
-    hjust = 1
-    size = 6
-  }
-  axis_title_size = 7
-  if (nchar(y_label) > 15) {
-    axis_title_size = 7
-  }
-  if (nchar(y_label) > 25) {
-    axis_title_size = 6
-  }
-  return (
-    ggplot2::theme_bw() + ggplot2::theme(
-      axis.text.x = ggplot2::element_text(
-        size = size,
-        vjust = 1,
-        hjust = hjust,
-        angle = angle
-      ),
-      axis.text.y = ggplot2::element_text(size = size - 2, hjust = 1),
-      axis.title = ggplot2::element_text(size = axis_title_size),
-      plot.title = ggplot2::element_text(size = 7, face = 'bold'),
-      legend.title = ggplot2::element_text(size = 6, face = 'bold'),
-      legend.text = ggplot2::element_text(size = 6),
-      axis.line = ggplot2::element_line(colour = 'black', size = .25),
-      axis.line.x = ggplot2::element_line(colour = 'black', size = .25),
-      axis.line.y = ggplot2::element_line(colour = 'black', size = .25),
-      panel.border = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank()
-    )
+
+#' @export
+theme_omicsEye <- function() list(
+  cowplot::theme_cowplot(),
+  ggplot2::theme(
+    text               = ggplot2::element_text(size = 6),
+    axis.text          = ggplot2::element_text(size = 5),
+    axis.title.x       = ggplot2::element_text(margin=ggplot2::margin(1, 0, 0.5, 0)),
+    axis.title.x.top   = ggplot2::element_text(margin=ggplot2::margin(0, 0, 2, 0)),
+    axis.title.y       = ggplot2::element_text(margin=ggplot2::margin(0, 1, 0, 0.5)),
+    axis.title.y.right = ggplot2::element_text(margin=ggplot2::margin(0, 0, 0, 2)),
+    axis.text.x        = ggplot2::element_text(margin=ggplot2::margin(1, 0, 0, 0)),
+    axis.text.x.top    = ggplot2::element_text(margin=ggplot2::margin(0, 0, 1, 0)),
+    axis.text.y        = ggplot2::element_text(margin=ggplot2::margin(0, 1, 0, 0)),
+    axis.text.y.right  = ggplot2::element_text(margin=ggplot2::margin(0, 0, 0, 1)),
+    axis.ticks         = ggplot2::element_line(size=0.3),
+    axis.ticks.length  = ggplot2::unit(2, "pt"),
+    axis.line          = ggplot2::element_line(size=0.3),
+    axis.line.x        = ggplot2::element_line(size=0.3),
+    axis.line.y        = ggplot2::element_line(size=0.3),
+    line               = ggplot2::element_line(size=0.3),
+    legend.margin      = ggplot2::margin(4, 4, 4, 4),
+    legend.key.size    = ggplot2::unit(8, "pt"),
+    legend.box.spacing = ggplot2::unit(4, "pt"),
+    panel.spacing      = ggplot2::unit(1.5, "pt"),
+    plot.title         = ggplot2::element_text(size=8),
+    plot.margin        = ggplot2::margin(1, 1, 1, 1),
+    strip.background   = ggplot2::element_blank(),
+    strip.text         = ggplot2::element_text(size=6),
+    strip.text.x       = ggplot2::element_text(margin= ggplot2::margin(3, 0, 3, 0)),
+    strip.text.y       = ggplot2::element_text(margin= ggplot2::margin(0, 3, 0, 3))
   )
-}
+)
+
 
 
 # Tweedieverse heatmap function for overall view of associations
