@@ -645,7 +645,7 @@ tweedie_index_plot <-
       ggplot2::aes(x=tweedie.index))+
       ggplot2::geom_histogram(position = "identity", alpha = 0.8)  +
       ggplot2::xlab("Tweedie index") + ggplot2::ylab("Number of omics features") +
-      ggplot2::theme_set(theme_omicsEye()) +
+      theme_omicsEye() +
       ggplot2::theme(legend.justification = c(0, 0),
                      legend.position = c(.3, .5))
 
