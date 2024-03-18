@@ -464,7 +464,7 @@ association_plots <-
             ggplot2::labs("") +
             ggplot2::xlab(x_label) +
             ggplot2::ylab(y_label) +
-            theme_omicsEye(input_df[, 'x'], y_label) +
+            theme_omicsEye() +
             ggplot2::annotate(
               geom = "text",
               x = Inf,
@@ -535,7 +535,7 @@ association_plots <-
           # format the figure to default nature format
           # remove legend, add x/y labels
           temp_plot <- temp_plot +
-            theme_omicsEye(input_df[, 'x'], y_label) +
+            theme_omicsEye() +
             ggplot2::theme(
               panel.grid.major = ggplot2::element_blank(),
               panel.grid.minor = ggplot2::element_blank(),
