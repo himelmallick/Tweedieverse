@@ -304,16 +304,24 @@ Tweedieverse <- function(input_features,
   # Extract features and metadata based on user-provided input #
   ##############################################################
   
-  if (!(methods::is(input_features, "SummarizedExperiment")) & !(methods::is(input_features, "SingleCellExperiment")) & !(is.character(input_features)) & !(is.data.frame(input_features))) {
-    stop(cat(paste('Input data of class <',class(input_features), '> not supported. Please use either SummarizedExperiment or SingleCellExperiment or data.frame')))
-  } else if (methods::is(input_features, "SummarizedExperiment") | methods::is(input_features, "SingleCellExperiment")) {
+  if (!(methods::is(input_features, "SummarizedExperiment")) &
+      !(methods::is(input_features, "SingleCellExperiment")) &
+      !(methods::is(input_features, "RangedSummarizedExperiment")) &
+      !(methods::is(input_features, "TreeSummarizedExperiment")) &
+      !(is.character(input_features)) & !(is.data.frame(input_features))) {
+    stop(cat(paste('Input data of class <', class(input_features), '> not supported. Please use SummarizedExperiment, SingleCellExperiment, RangedSummarizedExperiment, TreeSummarizedExperiment, or data.frame')))
+  } else if (methods::is(input_features, "SummarizedExperiment") |
+             methods::is(input_features, "SingleCellExperiment") |
+             methods::is(input_features, "RangedSummarizedExperiment") |
+             methods::is(input_features, "TreeSummarizedExperiment")) {
     SumExp <- methods::as(input_features, "SummarizedExperiment")
-    data <- assay(SumExp); metadata <- as(colData(SumExp),"data.frame")
-      if (is.null(SummarizedExperiment::assayNames(SumExp)) || SummarizedExperiment::assayNames(SumExp)[1] != "counts") {
-        message("Renaming the first element in assays(input_features) to 'counts'")
-        SummarizedExperiment::assayNames(SumExp)[1] <- "counts"
-        if (is.null(colnames(counts(SumExp)))) {stop("Must supply sample/cell names!")}
-        }
+    data <- assay(SumExp)
+    metadata <- as(colData(SumExp), "data.frame")
+    if (is.null(SummarizedExperiment::assayNames(SumExp)) || SummarizedExperiment::assayNames(SumExp)[1] != "counts") {
+      message("Renaming the first element in assays(input_features) to 'counts'")
+      SummarizedExperiment::assayNames(SumExp)[1] <- "counts"
+      if (is.null(colnames(counts(SumExp)))) {stop("Must supply sample/cell names!")}
+    }
   } else{
     
     # if a character string then this is a file name, else it
@@ -726,9 +734,9 @@ Tweedieverse <- function(input_features,
         )
       )
     } else {
+      offset <- unfiltered_metadata[, scale_factor]
       unfiltered_metadata <-
         dplyr::select(unfiltered_metadata,-scale_factor)
-      offset <- unfiltered_metadata[, scale_factor]
     }
   }
   
