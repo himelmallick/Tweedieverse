@@ -266,7 +266,7 @@
 #' @export
 Tweedieverse <- function(input_features,
                          input_metadata = NULL,
-                         output,
+                         output = NULL,
                          assay_name = "counts",
                          abd_threshold = 0.0,
                          prev_threshold = 0.1,
@@ -298,6 +298,8 @@ Tweedieverse <- function(input_features,
   #################################
   # Specify all available options #
   #################################
+  
+  no_output <- is.null(output)
   
   model_choices <- c("CPLM", "ZICP", "ZACP", "ZSCP")
   link_choices <- c("log", "identity", "sqrt", "inverse")
@@ -387,31 +389,36 @@ Tweedieverse <- function(input_features,
   }
     
   # create an output folder and figures folder if it does not exist
-  if (!file.exists(output)) {
-    print("Creating output folder")
-    dir.create(output)
+  if (!no_output) {
+    if (!file.exists(output)) {
+      print("Creating output folder")
+      dir.create(output)
+    }
+    
+    #if (plot_heatmap || plot_scatter) {
+    figures_folder <- file.path(output, "figures")
+    if (!file.exists(figures_folder)) {
+      print("Creating output figures folder")
+      dir.create(figures_folder)
+    }
+    #}
+    
+    # Create log file (write info to stdout and debug level to log file)
+    # Set level to finest so all log levels are reviewed
+    log_file <- file.path(output, "Tweedieverse.log")
+    # Remove log file if already exists (to avoid append)
+    if (file.exists(log_file)) {
+      print(paste("Warning: Deleting existing log file:", log_file))
+      unlink(log_file)
+    }
+    logging::basicConfig(level = 'FINEST')
+    logging::addHandler(logging::writeToFile,
+                        file = log_file, level = "DEBUG")
+    logging::setLevel(20, logging::getHandler('basic.stdout'))
+  } else {
+    # no_output mode: no folder, no figures, no log file on disk
+    figures_folder <- NULL
   }
-  
-  #if (plot_heatmap || plot_scatter) {
-  figures_folder <- file.path(output, "figures")
-  if (!file.exists(figures_folder)) {
-    print("Creating output figures folder")
-    dir.create(figures_folder)
-  }
-  #}
- 
-  # Create log file (write info to stdout and debug level to log file)
-  # Set level to finest so all log levels are reviewed
-  log_file <- file.path(output, "Tweedieverse.log")
-  # Remove log file if already exists (to avoid append)
-  if (file.exists(log_file)) {
-    print(paste("Warning: Deleting existing log file:", log_file))
-    unlink(log_file)
-  }
-  logging::basicConfig(level = 'FINEST')
-  logging::addHandler(logging::writeToFile,
-                      file = log_file, level = "DEBUG")
-  logging::setLevel(20, logging::getHandler('basic.stdout'))
   
   #####################
   # Log the arguments #
@@ -940,9 +947,6 @@ Tweedieverse <- function(input_features,
   # Write out the results #
   #########################
   
-  results_file <- file.path(output, "all_results.tsv")
-  logging::loginfo("Writing all results to file (ordered by increasing q-values): %s",
-                   results_file)
   ordered_results <-
     fit_data$results[order(fit_data$results$qval),]
   ordered_results <-
@@ -985,19 +989,26 @@ Tweedieverse <- function(input_features,
       everything()
     )
   
-  write.table(
-    ordered_results,
-    file = results_file,
-    sep = "\t",
-    quote = FALSE,
-    row.names = FALSE
-  )
   
+  if (!no_output) {
+    results_file <- file.path(output, "all_results.tsv")
+    logging::loginfo("Writing all results to file (ordered by increasing q-values): %s",
+                     results_file)
+    write.table(
+      ordered_results,
+      file = results_file,
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
   
   # Write results passing threshold to file
   # (removing any that are NA for the q-value)
   significant_results <-
     ordered_results[ordered_results$qval <= max_significance,]
+  
+  if (!no_output) {
   significant_results_file <-
     file.path(output, "significant_results.tsv")
   logging::loginfo(
@@ -1066,7 +1077,7 @@ Tweedieverse <- function(input_features,
       figures_folder
     )
   }
-  
+  }
   return(significant_results)
 }
 
