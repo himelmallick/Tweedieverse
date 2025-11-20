@@ -47,6 +47,8 @@
 #' If not found in metadata, defaults to the sample-wise total sums, unless \code{adjust_offset = FALSE}.
 #' @param max_significance The q-value threshold for significance. Default is 0.05.
 #' @param correction The correction method for computing the q-value (see \code{\link[stats]{p.adjust}} for options, default is 'BH').
+#' @param median_comparison If TRUE(default), coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Should only be used for relative abundance data.
+#' @param median_subtraction If TRUE, coefficients minus median will be used for compositionality adjustment. 
 #' @param standardize Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.
 #' @param cores An integer that indicates the number of R processes to run in parallel. Default is 1.
 #' @param optimizer The optimization routine to be used for estimating the parameters of the Tweedie model.
@@ -254,6 +256,8 @@
 #' base_model = 'CPLM',
 #' adjust_offset = FALSE, # No offset as the values are relative abundances
 #' cores = 8, # Make sure your computer has the capability
+#' median_comparison = TRUE,
+#' median_subtraction = TRUE,
 #' standardize = FALSE,
 #' reference = c('diagnosis,nonIBD'))
 #'
@@ -262,7 +266,7 @@
 #' @export
 Tweedieverse <- function(input_features,
                          input_metadata = NULL,
-                         output,
+                         output = NULL,
                          assay_name = "counts",
                          abd_threshold = 0.0,
                          prev_threshold = 0.1,
@@ -278,6 +282,8 @@ Tweedieverse <- function(input_features,
                          scale_factor = NULL,
                          max_significance = 0.05,
                          correction = "BH",
+                         median_comparison = TRUE,
+                         median_subtraction = FALSE,
                          standardize = TRUE,
                          cores = 1,
                          optimizer = "nlminb",
@@ -292,6 +298,8 @@ Tweedieverse <- function(input_features,
   #################################
   # Specify all available options #
   #################################
+  
+  no_output <- is.null(output)
   
   model_choices <- c("CPLM", "ZICP", "ZACP", "ZSCP")
   link_choices <- c("log", "identity", "sqrt", "inverse")
@@ -381,31 +389,36 @@ Tweedieverse <- function(input_features,
   }
     
   # create an output folder and figures folder if it does not exist
-  if (!file.exists(output)) {
-    print("Creating output folder")
-    dir.create(output)
+  if (!no_output) {
+    if (!file.exists(output)) {
+      print("Creating output folder")
+      dir.create(output)
+    }
+    
+    #if (plot_heatmap || plot_scatter) {
+    figures_folder <- file.path(output, "figures")
+    if (!file.exists(figures_folder)) {
+      print("Creating output figures folder")
+      dir.create(figures_folder)
+    }
+    #}
+    
+    # Create log file (write info to stdout and debug level to log file)
+    # Set level to finest so all log levels are reviewed
+    log_file <- file.path(output, "Tweedieverse.log")
+    # Remove log file if already exists (to avoid append)
+    if (file.exists(log_file)) {
+      print(paste("Warning: Deleting existing log file:", log_file))
+      unlink(log_file)
+    }
+    logging::basicConfig(level = 'FINEST')
+    logging::addHandler(logging::writeToFile,
+                        file = log_file, level = "DEBUG")
+    logging::setLevel(20, logging::getHandler('basic.stdout'))
+  } else {
+    # no_output mode: no folder, no figures, no log file on disk
+    figures_folder <- NULL
   }
-  
-  #if (plot_heatmap || plot_scatter) {
-  figures_folder <- file.path(output, "figures")
-  if (!file.exists(figures_folder)) {
-    print("Creating output figures folder")
-    dir.create(figures_folder)
-  }
-  #}
- 
-  # Create log file (write info to stdout and debug level to log file)
-  # Set level to finest so all log levels are reviewed
-  log_file <- file.path(output, "Tweedieverse.log")
-  # Remove log file if already exists (to avoid append)
-  if (file.exists(log_file)) {
-    print(paste("Warning: Deleting existing log file:", log_file))
-    unlink(log_file)
-  }
-  logging::basicConfig(level = 'FINEST')
-  logging::addHandler(logging::writeToFile,
-                      file = log_file, level = "DEBUG")
-  logging::setLevel(20, logging::getHandler('basic.stdout'))
   
   #####################
   # Log the arguments #
@@ -934,13 +947,33 @@ Tweedieverse <- function(input_features,
   # Write out the results #
   #########################
   
-  results_file <- file.path(output, "all_results.tsv")
-  logging::loginfo("Writing all results to file (ordered by increasing q-values): %s",
-                   results_file)
   ordered_results <-
     fit_data$results[order(fit_data$results$qval),]
   ordered_results <-
     ordered_results[!is.na(ordered_results$qval),] # Remove NA's
+  
+  if (median_comparison) {
+
+    mc_input <- ordered_results %>%
+      dplyr::rename(taxon = feature,
+                    effect_size = coef)
+    
+    mc_out <- median_comparison_tweedie(mc_input,
+                                        p_cutoff = 0.95,  # ignore p≥0.95
+                                        subtract_median = median_subtraction,
+                                        n_sims = 10000,
+                                        median_threshold = 0)
+    
+    ## Replace the classical columns with median‑based ones
+    ordered_results$coef <- mc_out$coef_median
+    ordered_results$pval <- mc_out$pval_median
+    ordered_results$qval <- p.adjust(mc_out$pval_median,
+                                     method = correction)
+    
+    ordered_results <- ordered_results[order(ordered_results$qval),]
+    rownames(ordered_results) <- NULL 
+  }
+  
   ordered_results <-
     dplyr::select(
       ordered_results,
@@ -955,19 +988,27 @@ Tweedieverse <- function(input_features,
       ),
       everything()
     )
-  write.table(
-    ordered_results,
-    file = results_file,
-    sep = "\t",
-    quote = FALSE,
-    row.names = FALSE
-  )
   
+  
+  if (!no_output) {
+    results_file <- file.path(output, "all_results.tsv")
+    logging::loginfo("Writing all results to file (ordered by increasing q-values): %s",
+                     results_file)
+    write.table(
+      ordered_results,
+      file = results_file,
+      sep = "\t",
+      quote = FALSE,
+      row.names = FALSE
+    )
+  }
   
   # Write results passing threshold to file
   # (removing any that are NA for the q-value)
   significant_results <-
     ordered_results[ordered_results$qval <= max_significance,]
+  
+  if (!no_output) {
   significant_results_file <-
     file.path(output, "significant_results.tsv")
   logging::loginfo(
@@ -1036,7 +1077,7 @@ Tweedieverse <- function(input_features,
       figures_folder
     )
   }
-  
+  }
   return(significant_results)
 }
 

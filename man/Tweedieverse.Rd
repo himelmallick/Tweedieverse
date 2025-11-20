@@ -23,6 +23,8 @@ Tweedieverse(
   scale_factor = NULL,
   max_significance = 0.05,
   correction = "BH",
+  median_comparison = TRUE,
+  median_subtraction = FALSE,
   standardize = TRUE,
   cores = 1,
   optimizer = "nlminb",
@@ -96,6 +98,10 @@ If not found in metadata, defaults to the sample-wise total sums, unless \code{a
 \item{max_significance}{The q-value threshold for significance. Default is 0.05.}
 
 \item{correction}{The correction method for computing the q-value (see \code{\link[stats]{p.adjust}} for options, default is 'BH').}
+
+\item{median_comparison}{If TRUE(default), coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Should only be used for relative abundance data.}
+
+\item{median_subtraction}{If TRUE, coefficients minus median will be used for compositionality adjustment.}
 
 \item{standardize}{Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.}
 
@@ -308,6 +314,8 @@ random_effects = c('site', 'subject'),
 base_model = 'CPLM',
 adjust_offset = FALSE, # No offset as the values are relative abundances
 cores = 8, # Make sure your computer has the capability
+median_comparison = TRUE,
+median_subtraction = TRUE,
 standardize = FALSE,
 reference = c('diagnosis,nonIBD'))
 

@@ -11,6 +11,7 @@ Depends: R (>= 3.6)
 Imports: cplm, statmod, glmmTMB, pbapply, logging, parallel, dplyr, tweedie, ggplot2, grid, pheatmap, bbmle, parameters, cowplot
 Suggests: data.table, knitr
 License: MIT + file LICENSE
+Encoding: UTF-8
 LazyData: TRUE
 RoxygenNote: 7.3.2
 VignetteBuilder: knitr

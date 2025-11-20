@@ -3,6 +3,7 @@
 export(Tweedieverse)
 export(Tweedieverse_heatmap)
 export(entropy)
+export(median_comparison_tweedie)
 export(theme_omicsEye)
 importFrom(dplyr,"%>%")
 importFrom(dplyr,everything)
