@@ -43,7 +43,7 @@ The input `df` with two new columns:
 }
 \description{
 Adjust Tweedieverse(or any other differential analysis methods) coefficient estimates and p-values by testing each taxon
-against the *median* effect for the same metadata variable — a simple
+against the *median* effect for the same metadata variable - a simple
 post-hoc strategy to curb false discoveries driven by the compositional
 nature of microbiome count data (after the approach adopted in **MaAsLin 3**).
 }
@@ -52,11 +52,11 @@ For every distinct value in `metadata` the algorithm
 \enumerate{
   \item keeps coefficients with `pval < p_cutoff` and computes their median;
   \item simulates `n_sims` draws of coefficients using a normal
-        approximation (`N(effect_size, stderr²)`) and records the empirical
+        approximation (`N(effect_size, stderr^2)`) and records the empirical
         distribution of the simulated medians;
   \item derives a variance-inflated *offset* that accounts for the
         covariance between each coefficient and the group median;
-  \item performs a two-sided Z-test of `H₀ : βᵢ = offsetᵢ`, returning the
+  \item performs a two-sided Z-test of `H0 : beta_i = offset_i`, returning the
         resulting p-value in `pval_median`.
 }
 }
@@ -68,6 +68,16 @@ zero or missing.
 }
 
 \examples{
+toy <- data.frame(
+  taxon = c("tax1", "tax2"),
+  metadata = c("grp", "grp"),
+  effect_size = c(0.4, 0.2),
+  pval = c(0.01, 0.2),
+  stderr = c(0.1, 0.1),
+  qval = c(0.02, 0.25)
+)
+median_comparison_tweedie(toy, n_sims = 100)
+
 \dontrun{
 
 ######################

@@ -32,23 +32,37 @@
 #' Default value for \code{var_threshold} is \code{0.0} (i.e. no variance filtering).
 #' @param entropy_threshold If entropy-based filtering is desired for metadata, only features that have entropy greater than
 #' \code{entropy_threshold} are retained. Default value for \code{entropy_threshold} is \code{0.0} (i.e. no entropy filtering).
-#' @param base_model The per-feature base model. Default is "CPLM". Must be one of "CPLM", "ZICP", "ZSCP", or "ZACP".
+#' @param base_model The per-feature base model. Only "CPLM" is supported.
 #' @param link A specification of the GLM link function. Default is "log". Must be one of "log", "identity", "sqrt", or "inverse".
+#' @param tweedie_p Numeric Tweedie variance power. Default is \code{NULL}, which estimates the compound-Poisson
+#' Tweedie index in the usual \code{1 < p < 2} range when all filtered feature values are non-negative.
+#' If \code{tweedie_p} is \code{NULL} or \code{NA} and filtered features contain negative values, it is resolved
+#' to \code{0}, the Gaussian case. Values between 0 and 1 are undefined and rejected. Other supplied values
+#' pin the model to that fixed index. Negative supplied powers are allowed with a warning for non-negative data,
+#' but negative feature values are supported only at \code{p = 0}.
+#' Random-effect models support fixed \code{p = 0}, \code{p = 1}, \code{1 < p < 2}, \code{p = 2}, and \code{p = 3}.
 #' @param fixed_effects Metadata variable(s) describing the fixed effects coefficients.
 #' @param random_effects Metadata variable(s) describing the random effects part of the model.
-#' @param cutoff_ZSCP For \code{base_model = "ZSCP"}, the cutoff to stratify features for
-#' adaptive ZI modeling based on sparsity (zero-inflation proportion). Default is 0.3. Must be between 0 and 1.
-#' @param criteria_ZACP For \code{base_model = "ZACP"}, the criteria to select the
-#' best fitting model per feature.  The possible options are 'AIC' and BIC' (default).
-#' More criteria will be supported in a future release.
 #' @param adjust_offset If TRUE (default), an offset term will be included as the logarithm of \code{scale_factor}.
 #' @param scale_factor Name of the numerical variable containing library size (for non-normalized data) or scale factor
 #' (for normalized data) across samples to be included as an offset in the base model (when \code{adjust_offset = TRUE}).
 #' If not found in metadata, defaults to the sample-wise total sums, unless \code{adjust_offset = FALSE}.
 #' @param max_significance The q-value threshold for significance. Default is 0.05.
 #' @param correction The correction method for computing the q-value (see \code{\link[stats]{p.adjust}} for options, default is 'BH').
-#' @param median_comparison If TRUE(default), coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Should only be used for relative abundance data.
+#' @param Maaslin2_run Logical. For \code{tweedie_p = 0}, run the MaAsLin2 linear-model path instead of the
+#' Tweedie GLM path. Set to FALSE to fit \code{tweedie_p = 0} with the Tweedie GLM. Default is TRUE.
+#' When the resolved Tweedie index is \code{0}, non-identity links are changed to \code{"identity"} and
+#' \code{adjust_offset} is disabled.
+#' @param median_comparison If TRUE, coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Default is FALSE. Should only be used for relative abundance data.
 #' @param median_subtraction If TRUE, coefficients minus median will be used for compositionality adjustment. 
+#' @param run_presence_absence_model If TRUE, also fit a DAssemble-style presence-absence logistic regression model
+#' alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
+#' Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
+#' of the two p-values. Default is FALSE.
+#' @param method_args Optional named list of method-specific arguments. For \code{tweedie_p = 0}, use
+#' \code{method_args = list(Maaslin2 = list(...))} to pass arguments to \code{\link[Maaslin2]{Maaslin2}};
+#' user-supplied values override Tweedieverse defaults.
+#' @param method.args Alias for \code{method_args}.
 #' @param standardize Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.
 #' @param cores An integer that indicates the number of R processes to run in parallel. Default is 1.
 #' @param optimizer The optimization routine to be used for estimating the parameters of the Tweedie model.
@@ -62,8 +76,9 @@
 #' @param reference The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).
 #'
 #' @importFrom grDevices colorRampPalette dev.off jpeg pdf
-#' @importFrom stats coef fitted as.formula na.exclude p.adjust plogis sd update
-#' @importFrom utils capture.output read.table write.table
+#' @importFrom stats coef fitted as.formula na.exclude p.adjust plogis relevel sd update
+#' @importFrom utils capture.output read.table type.convert write.table
+#' @importFrom SummarizedExperiment colData
 #' @importFrom dplyr %>% everything
 #' @importFrom parallel clusterExport
 #' @return A data frame containing coefficient estimates, p-values, and q-values (multiplicity-adjusted p-values) are returned.
@@ -72,197 +87,41 @@
 #'
 #' @examples
 #'
-#' \dontrun{
-#'
-#' ##############################################################################
-#' # Example 1 - Differential Abundance Analysis of Synthetic Microbiome Counts #
-#' ##############################################################################
-#'
-#' #######################################
-#' # Install and Load Required Libraries #
-#' #######################################
-#'
-#' library(devtools)
-#' devtools::install_github('biobakery/sparseDOSSA@@varyLibSize')
-#' library(sparseDOSSA)
-#' library(stringi)
-#'
-#' ######################
-#' # Specify Parameters #
-#' ######################
-#'
-#' n.microbes <- 200 # Number of Features
-#' n.samples <- 100 # Number of Samples
-#' spike.perc <- 0.02 # Percentage of Spiked-in Bugs
-#' spikeStrength<-"20" # Effect Size
-#'
-#' ###########################
-#' # Specify Binary Metadata #
-#' ###########################
-#'
-#' n.metadata <- 1
-#' UserMetadata<-as.matrix(rep(c(0,1), each=n.samples/2))
-#' UserMetadata<-t(UserMetadata) # Transpose
-#'
-#' ###################################################
-#' # Spiked-in Metadata (Which Metadata to Spike-in) #
-#' ###################################################
-#'
-#' Metadatafrozenidx<-1
-#' spikeCount<-as.character(length(Metadatafrozenidx))
-#' significant_metadata<-paste('Metadata', Metadatafrozenidx, sep='')
-#'
-#' #############################################
-#' # Generate SparseDOSSA Synthetic Abundances #
-#' #############################################
-#'
-#' DD<-sparseDOSSA::sparseDOSSA(number_features = n.microbes,
-#' number_samples = n.samples,
-#' UserMetadata=UserMetadata,
-#' Metadatafrozenidx=Metadatafrozenidx,
-#' datasetCount = 1,
-#' spikeCount = spikeCount,
-#' spikeStrength = spikeStrength,
-#' noZeroInflate=TRUE,
-#' percent_spiked=spike.perc,
-#' seed = 1234)
-#'
-#' ##############################
-#' # Gather SparseDOSSA Outputs #
-#' ##############################
-#'
-#' sparsedossa_results <- as.data.frame(DD$OTU_count)
-#' rownames(sparsedossa_results)<-sparsedossa_results$X1
-#' sparsedossa_results<-sparsedossa_results[-1,-1]
-#' colnames(sparsedossa_results)<-paste('Sample', 1:ncol(sparsedossa_results), sep='')
-#' data<-as.matrix(sparsedossa_results[-c((n.metadata+1):(2*n.microbes+n.metadata)),])
-#' data<-data.matrix(data)
-#' class(data) <- "numeric"
-#' truth<-c(unlist(DD$truth))
-#' truth<-truth[!stri_detect_fixed(truth,":")]
-#' truth<-truth[(5+n.metadata):length(truth)]
-#' truth<-as.data.frame(truth)
-#' significant_features<-truth[seq(1,
-#' (as.numeric(spikeCount)+1)*(n.microbes*spike.perc), (as.numeric(spikeCount)+1)),]
-#' significant_features<-as.vector(significant_features)
-#'
-#' ####################
-#' # Extract Features #
-#' ####################
-#'
-#' features<-as.data.frame(t(data[-c(1:n.metadata),]))
-#'
-#' ####################
-#' # Extract Metadata #
-#' ####################
-#'
-#' metadata<-as.data.frame(data[1,])
-#' colnames(metadata)<-rownames(data)[1]
-#'
-#' ###############################
-#' # Mark True Positive Features #
-#' ###############################
-#'
-#' wh.TP = colnames(features) %in% significant_features
-#' colnames(features)<-paste("Feature", 1:n.microbes, sep = "")
-#' newname = paste0(colnames(features)[wh.TP], "_TP")
-#' colnames(features)[wh.TP] <- newname;
-#' colnames(features)[grep('TP', colnames(features))]
-#'
-#' ####################
-#' # Run Tweedieverse #
-#' ###################
-#'
-#' ###################
-#' # Default options #
-#' ###################
-#'
-#' CPLM <-Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/CPLM') # Assuming demo_output exists
-#'
-#' ###############################################
-#' # User-defined prevalence-abundance filtering #
-#' ###############################################
-#'
-#' ZICP<-Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/ZICP', # Assuming demo_output exists
-#' base_model = 'ZICP',
-#' abd_threshold = 0.0,
-#' prev_threshold = 0.2)
-#'
-#' ####################################
-#' # User-defined variance filtering  #
-#' ####################################
-#'
-#' sds<-apply(features, 2, sd)
-#' var_threshold = median(sds)/2
-#' ZSCP<-Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/ZSCP', # Assuming demo_output exists
-#' base_model = 'ZSCP',
-#' var_threshold = var_threshold)
-#'
-#' ##################
-#' # Multiple cores #
-#' ##################
-#'
-#' ZACP<-Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/ZACP', # Assuming demo_output exists
-#' base_model = 'ZACP',
-#' cores = 4)
-#'
-#' ##########################################################################
-#' # Example 2 - Multivariable Association on HMP2 Longitudinal Microbiomes #
-#' ##########################################################################
-#'
-#' ######################
-#' # HMP2 input_features Analysis #
-#' ######################
-#'
-#' #############
-#' # Load input_features #
-#' #############
+#' set.seed(123)
+#' features <- as.data.frame(matrix(rpois(24, lambda = 5), nrow = 12, ncol = 2))
+#' colnames(features) <- c("feature1", "feature2")
+#' rownames(features) <- paste0("sample", seq_len(nrow(features)))
+#' metadata <- data.frame(
+#'   group = rep(c("A", "B"), each = 6),
+#'   row.names = rownames(features)
+#' )
+#' fit <- Tweedieverse(
+#'   input_features = features,
+#'   input_metadata = metadata,
+#'   output = NULL,
+#'   fixed_effects = "group",
+#'   median_comparison = FALSE,
+#'   cores = 1
+#' )
+#' head(fit)
 #' 
-#' library(data.table)
-#' input_features <- fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_taxonomy.tsv", sep ="\t")
-#' input_metadata <-fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv", sep ="\t")
-#'
-#' ###############
-#' # Format data #
-#' ###############
-#'
-#' library(tibble)
-#' features<- column_to_rownames(input_features, 'ID')
-#' metadata<- column_to_rownames(input_metadata, 'ID')
-#'
-#' #############
-#' # Fit Model #
-#' #############
-#'
-#' library(Tweedieverse)
-#' HMP2 <- Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/HMP2', # Assuming demo_output exists
-#' fixed_effects = c('diagnosis', 'dysbiosisnonIBD','dysbiosisUC','dysbiosisCD', 'antibiotics', 'age'),
-#' random_effects = c('site', 'subject'),
-#' base_model = 'CPLM',
-#' adjust_offset = FALSE, # No offset as the values are relative abundances
-#' cores = 8, # Make sure your computer has the capability
-#' median_comparison = TRUE,
-#' median_subtraction = TRUE,
-#' standardize = FALSE,
-#' reference = c('diagnosis,nonIBD'))
-#'
+#' \dontrun{
+#' maaslin2_median_fit <- Tweedieverse(
+#'   input_features = features,
+#'   input_metadata = metadata,
+#'   output = NULL,
+#'   fixed_effects = "group",
+#'   tweedie_p = 0,
+#'   Maaslin2_run = TRUE,
+#'   median_comparison = TRUE,
+#'   median_subtraction = TRUE,
+#'   cores = 1
+#' )
 #' }
-#' @keywords microbiome, metagenomics, multiomics, scRNASeq, tweedie, singlecell
+#' 
+#' # For a full iHMP workflow example, see:
+#' # vignette("Tweedieverse-vignette", package = "Tweedieverse")
+#' @keywords microbiome metagenomics multiomics scRNASeq tweedie singlecell
 #' @export
 Tweedieverse <- function(input_features,
                          input_metadata = NULL,
@@ -274,16 +133,19 @@ Tweedieverse <- function(input_features,
                          entropy_threshold = 0.0,
                          base_model = "CPLM",
                          link = "log",
+                         tweedie_p = NULL,
                          fixed_effects = NULL,
                          random_effects = NULL,
-                         cutoff_ZSCP = 0.3,
-                         criteria_ZACP = "BIC",
                          adjust_offset = TRUE,
                          scale_factor = NULL,
                          max_significance = 0.05,
                          correction = "BH",
-                         median_comparison = TRUE,
+                         Maaslin2_run = TRUE,
+                         median_comparison = FALSE,
                          median_subtraction = FALSE,
+                         run_presence_absence_model = FALSE,
+                         method_args = NULL,
+                         method.args = NULL,
                          standardize = TRUE,
                          cores = 1,
                          optimizer = "nlminb",
@@ -301,9 +163,8 @@ Tweedieverse <- function(input_features,
   
   no_output <- is.null(output)
   
-  model_choices <- c("CPLM", "ZICP", "ZACP", "ZSCP")
+  model_choices <- c("CPLM")
   link_choices <- c("log", "identity", "sqrt", "inverse")
-  criteria_ZACP_choices <- c("AIC", "BIC")
   correction_choices <-
     c("BH", "holm", "hochberg", "hommel", "bonferroni", "BY")
   optimizer_choices <- c("nlminb", "bobyqa", "L-BFGS-B")
@@ -325,81 +186,70 @@ Tweedieverse <- function(input_features,
   # Extract features and metadata based on user-provided input #
   ##############################################################
   
-  input_class<-class(input_features)
-  if (input_class %in% valid_classes) {
+  is_supported_bioc_class <- inherits(input_features, valid_classes)
+  if (is_supported_bioc_class) {
     data <- extractAssay(input_features, assay_name)
-    if(is.null(input_metadata)) {
-      metadata <- data.frame(colData(input_features))
-    } else{
-      metadata<-input_metadata
+    if (is.null(input_metadata)) {
+      metadata <- data.frame(SummarizedExperiment::colData(input_features))
+    } else {
+      metadata <- input_metadata
     }
-  } else if (!(is.character(input_features)) & !(is.data.frame(input_features))) {
-    stop(cat(paste('Input data of class <', class(input_features), '> not supported. Please use SummarizedExperiment, SingleCellExperiment, RangedSummarizedExperiment, TreeSummarizedExperiment, or data.frame')))
-  } else{
+  } else if (!(is.character(input_features)) && !(is.data.frame(input_features))) {
+    stop(
+      sprintf(
+        paste(
+          "Input data of class <%s> not supported.",
+          "Please use SummarizedExperiment, SingleCellExperiment,",
+          "RangedSummarizedExperiment, TreeSummarizedExperiment, or data.frame."
+        ),
+        class(input_features)[1]
+      )
+    )
+  } else {
     
     # if a character string then this is a file name, else it
     # is a data frame
     if (is.character(input_features)) {
-      data <-
-        data.frame(
-          read.delim::fread(input_features, header = TRUE, sep = '\t'),
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      if (nrow(input_features) == 1) {
-        # read again to get row name
-        data <- read.delim(
-          input_features,
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      }
+      data <- read_input_table(input_features)
     } else {
       data <- input_features
     }
     if (is.character(input_metadata)) {
-      input_metadata <-
-        data.frame(
-          read.delim::fread(input_metadata, header = TRUE, sep = '\t'),
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      if (nrow(input_metadata) == 1) {
-        input_metadata <- read.delim(
-          input_metadata,
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      }
+      metadata <- read_input_table(input_metadata)
     } else {
       metadata <- input_metadata
+    }
+    if (is.null(metadata)) {
+      stop(
+        paste(
+          "input_metadata must be provided when input_features is not",
+          "a SummarizedExperiment-like object."
+        )
+      )
     }
   }
     
   # create an output folder and figures folder if it does not exist
   if (!no_output) {
-    if (!file.exists(output)) {
-      print("Creating output folder")
-      dir.create(output)
+    if (file.exists(output) && !dir.exists(output)) {
+      stop(sprintf("Output path exists but is not a directory: %s", output))
+    }
+    if (!dir.exists(output)) {
+      message(sprintf("Creating output folder: %s", output))
+      dir.create(output, recursive = TRUE, showWarnings = FALSE)
+    }
+    if (!dir.exists(output)) {
+      stop(sprintf("Unable to create output folder: %s", output))
     }
     
     #if (plot_heatmap || plot_scatter) {
     figures_folder <- file.path(output, "figures")
-    if (!file.exists(figures_folder)) {
-      print("Creating output figures folder")
-      dir.create(figures_folder)
+    if (!dir.exists(figures_folder)) {
+      message(sprintf("Creating output figures folder: %s", figures_folder))
+      dir.create(figures_folder, recursive = TRUE, showWarnings = FALSE)
+    }
+    if (!dir.exists(figures_folder)) {
+      stop(sprintf("Unable to create output figures folder: %s", figures_folder))
     }
     #}
     
@@ -438,14 +288,17 @@ Tweedieverse <- function(input_features,
   logging::logdebug("Variance threshold: %f", var_threshold)
   logging::logdebug("Base model: %s", base_model)
   logging::logdebug("Link function: %s", link)
+  logging::logdebug("Tweedie variance power: %s", ifelse(is.null(tweedie_p), "NULL", tweedie_p))
   logging::logdebug("Fixed effects: %s", fixed_effects)
   logging::logdebug("Random effects: %s", random_effects)
-  logging::logdebug("ZSCP cutoff: %f", cutoff_ZSCP)
-  logging::logdebug("ZACP criteria: %s", criteria_ZACP)
   logging::logdebug("Offset adjustment: %s", adjust_offset)
   logging::logdebug("Scale factor: %s", scale_factor)
   logging::logdebug("Max significance: %f", max_significance)
   logging::logdebug("Correction method: %s", correction)
+  logging::logdebug("Run MaAsLin2 for tweedie_p = 0: %s", Maaslin2_run)
+  logging::logdebug("Run presence-absence model: %s", run_presence_absence_model)
+  logging::logdebug("Method-specific arguments provided: %s",
+                    !is.null(method_args) || !is.null(method.args))
   logging::logdebug("Standardize: %s", standardize)
   logging::logdebug("Cores: %d", cores)
   logging::logdebug("Optimization routine: %s", optimizer)
@@ -472,17 +325,6 @@ Tweedieverse <- function(input_features,
     )
   }
   
-  # Check if the selected criteria_ZACP is valid
-    if (!criteria_ZACP %in% criteria_ZACP_choices) {
-      option_not_valid_error(
-        paste(
-          "Please select a criteria",
-          "from the list of available options"
-        ),
-        toString(criteria_ZACP_choices)
-      )
-    }
-  
   # Check if the selected correction is valid
   if (!correction %in% correction_choices) {
     option_not_valid_error(
@@ -504,17 +346,58 @@ Tweedieverse <- function(input_features,
       toString(correction_choices)
     )
   }
+
+  if (!is.null(tweedie_p)) {
+    if (length(tweedie_p) != 1L) {
+      stop("tweedie_p must be NULL, NA, or a single finite numeric value.")
+    }
+    if (is.na(tweedie_p)) {
+      tweedie_p <- NULL
+    } else if (!is.numeric(tweedie_p)) {
+      stop("tweedie_p must be NULL, NA, or a single finite numeric value.")
+    } else if (!is.finite(tweedie_p)) {
+      stop("tweedie_p must be NULL, NA, or a single finite numeric value.")
+    }
+  }
+
+  if (!is.null(tweedie_p)) {
+    if (tweedie_p > 0 && tweedie_p < 1) {
+      stop("Tweedie variance powers between 0 and 1 are undefined and are not supported.")
+    }
+  }
+
+  if (!is.logical(run_presence_absence_model) ||
+      length(run_presence_absence_model) != 1L ||
+      is.na(run_presence_absence_model)) {
+    stop("run_presence_absence_model must be TRUE or FALSE.")
+  }
+
+  if (!is.logical(Maaslin2_run) ||
+      length(Maaslin2_run) != 1L ||
+      is.na(Maaslin2_run)) {
+    stop("Maaslin2_run must be TRUE or FALSE.")
+  }
+
+  if (!is.null(method_args) && !is.null(method.args)) {
+    stop("Please provide only one of method_args or method.args.")
+  }
+  if (is.null(method_args)) {
+    method_args <- method.args
+  }
+  if (!is.null(method_args) && !is.list(method_args)) {
+    stop("method_args must be NULL or a named list.")
+  }
   
   ############################################################
   # Check if the selected numerical options are within range #
   ############################################################
   
-  prop_options <- c(prev_threshold, cutoff_ZSCP, max_significance)
+  prop_options <- c(prev_threshold, max_significance)
   if (any(prop_options < 0) || any(prop_options > 1)) {
     stop(
       paste(
         "One of the following is outside [0, 1]:",
-        "prev_threshold, cutoff_ZSCP, max_significance"
+        "prev_threshold, max_significance"
       )
     )
   }
@@ -539,7 +422,7 @@ Tweedieverse <- function(input_features,
         "as columns and metadata samples as rows"
       ))
       # transpose data frame so samples are rows
-      data <- type.convert(as.data.frame(t(data)))
+      data <- utils::type.convert(as.data.frame(t(data)))
       logging::logdebug("linked data so samples are rows")
     } else {
       samples_column_column <-
@@ -551,8 +434,8 @@ Tweedieverse <- function(input_features,
             "as columns and metadata samples as columns"
           )
         )
-        data <- type.convert(as.data.frame(t(data)))
-        metadata <- type.convert(as.data.frame(t(metadata)))
+        data <- utils::type.convert(as.data.frame(t(data)))
+        metadata <- utils::type.convert(as.data.frame(t(metadata)))
         logging::logdebug("linked data and metadata so samples are rows")
       } else {
         samples_row_column <-
@@ -564,7 +447,7 @@ Tweedieverse <- function(input_features,
               "as rows and metadata samples as columns"
             )
           )
-          metadata <- type.convert(as.data.frame(t(metadata)))
+          metadata <- utils::type.convert(as.data.frame(t(metadata)))
           logging::logdebug("linked metadata so samples are rows")
         } else {
           logging::logerror(
@@ -662,11 +545,11 @@ Tweedieverse <- function(input_features,
     # if metadata has 2 levels, allow but don't require setting reference level, otherwise require it
     if ((length(mlevels) == 2)) {
       if(!is.na(ref)) {
-        metadata[,i] = relevel(metadata[,i], ref = ref)
+        metadata[, i] <- stats::relevel(metadata[, i], ref = ref)
       }
     } else if (length(mlevels) > 2) {
       if (!is.na(ref)) {
-        metadata[,i] = relevel(metadata[,i], ref = ref)
+        metadata[, i] <- stats::relevel(metadata[, i], ref = ref)
       } else {
         stop(paste("Please provide the reference for the variable '",
                    i, "' which includes more than 2 levels: ",
@@ -723,7 +606,7 @@ Tweedieverse <- function(input_features,
   # Filter data based on variance #
   #################################
   
-  sds <- apply(filtered_data, 2, na.rm = T, sd)
+  sds <- apply(filtered_data, 2, na.rm = TRUE, sd)
   final_features <-
     filtered_data[, which(sds > var_threshold), drop = FALSE]
   total_filtered_features_var <-
@@ -734,6 +617,59 @@ Tweedieverse <- function(input_features,
     setdiff(names(filtered_data), names(final_features))
   logging::loginfo("Filtered feature names: %s",
                    toString(filtered_feature_names_var))
+
+  ############################################################
+  # Resolve Tweedie index after filtering the feature matrix #
+  ############################################################
+
+  has_negative_data <- any(as.matrix(final_features) < 0, na.rm = TRUE)
+  if (is.null(tweedie_p) && has_negative_data) {
+    message(
+      paste(
+        "Negative feature values detected after filtering;",
+        "p = 0 is the only Tweedie index whose support includes negative values.",
+        "Setting tweedie_p = 0."
+      )
+    )
+    tweedie_p <- 0
+  } else if (!is.null(tweedie_p) && tweedie_p != 0 && has_negative_data) {
+    stop(
+      paste(
+        "Negative feature values are supported only when tweedie_p = 0.",
+        "Set tweedie_p = 0, leave tweedie_p unspecified, or transform the negatives away."
+      )
+    )
+  }
+
+  if (!is.null(tweedie_p) && tweedie_p < 0) {
+    warning(
+      paste(
+        "Negative Tweedie variance powers are rarely used.",
+        "The model will run at the supplied tweedie_p, but requires strictly positive fitted means."
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (!is.null(tweedie_p) && tweedie_p == 0 && link != "identity") {
+    message(
+      paste(
+        "tweedie_p = 0 uses the Gaussian variance case;",
+        "setting link = 'identity' because the requested link is undefined for negative responses."
+      )
+    )
+    link <- "identity"
+  }
+
+  if (!is.null(tweedie_p) && tweedie_p == 0 && adjust_offset) {
+    message(
+      paste(
+        "tweedie_p = 0 with identity link does not use a log(scale_factor) offset;",
+        "setting adjust_offset = FALSE."
+      )
+    )
+    adjust_offset <- FALSE
+  }
   
   
   ########################################################################
@@ -764,7 +700,7 @@ Tweedieverse <- function(input_features,
   ####################################
   
   # Reduce metadata to only include those pass entropy threshold
-  temp_filtered_metadata <- unfiltered_metadata[, apply(unfiltered_metadata, 2, entropy) > entropy_threshold, drop=F]
+  temp_filtered_metadata <- unfiltered_metadata[, apply(unfiltered_metadata, 2, entropy) > entropy_threshold, drop = FALSE]
   excluded_metadata <- setdiff(colnames(unfiltered_metadata), colnames(temp_filtered_metadata))
   logging::loginfo(
     paste(
@@ -903,10 +839,11 @@ Tweedieverse <- function(input_features,
     metadata = final_metadata,
     base_model = base_model,
     link = link,
+    tweedie_p = tweedie_p,
+    Maaslin2_run = Maaslin2_run,
+    method_args = method_args,
     formula = formula,
     random_effects_formula = random_effects_formula,
-    cutoff_ZSCP = cutoff_ZSCP,
-    criteria_ZACP = criteria_ZACP,
     adjust_offset = adjust_offset,
     correction = correction,
     cores = cores,
@@ -954,17 +891,17 @@ Tweedieverse <- function(input_features,
   
   if (median_comparison) {
 
-    mc_input <- ordered_results %>%
-      dplyr::rename(taxon = feature,
-                    effect_size = coef)
+    mc_input <- ordered_results
+    names(mc_input)[names(mc_input) == "feature"] <- "taxon"
+    names(mc_input)[names(mc_input) == "coef"] <- "effect_size"
     
     mc_out <- median_comparison_tweedie(mc_input,
-                                        p_cutoff = 0.95,  # ignore p≥0.95
+                                        p_cutoff = 0.95,  # ignore p>=0.95
                                         subtract_median = median_subtraction,
                                         n_sims = 10000,
                                         median_threshold = 0)
     
-    ## Replace the classical columns with median‑based ones
+    ## Replace the classical columns with median-based ones
     ordered_results$coef <- mc_out$coef_median
     ordered_results$pval <- mc_out$pval_median
     ordered_results$qval <- p.adjust(mc_out$pval_median,
@@ -972,6 +909,24 @@ Tweedieverse <- function(input_features,
     
     ordered_results <- ordered_results[order(ordered_results$qval),]
     rownames(ordered_results) <- NULL 
+  }
+
+  if (run_presence_absence_model) {
+    presence_results <- fit_presence_absence_model(
+      features = final_features,
+      metadata = final_metadata,
+      formula = formula,
+      random_effects_formula = random_effects_formula,
+      correction = correction,
+      cores = cores
+    )
+    ordered_results <- combine_abundance_presence_results(
+      abundance_results = ordered_results,
+      presence_results = presence_results,
+      correction = correction
+    )
+    ordered_results <- ordered_results[order(ordered_results$qval),]
+    rownames(ordered_results) <- NULL
   }
   
   ordered_results <-
@@ -1044,7 +999,9 @@ Tweedieverse <- function(input_features,
     # dev.off()
   })
   
-  if (plot_heatmap & length(unique(significant_results_file["metdata"])) > 1) {
+  if (plot_heatmap &&
+      nrow(significant_results) > 0 &&
+      length(unique(significant_results$metadata)) > 1) {
     heatmap_file <- file.path(output, "Tweedieverse_Heatmap.pdf")
     logging::loginfo("Writing heatmap of significant results to file: %s",
                      heatmap_file)
@@ -1088,4 +1045,27 @@ option_not_valid_error <- function(message, valid_options) {
 }
 
 ## Quiets concerns of R CMD check
-utils::globalVariables(c("name"))
+utils::globalVariables(c(
+  "base.model",
+  "base.model_abundance",
+  "base.model_presence",
+  "coef",
+  "coef_abundance",
+  "coef_presence",
+  "data",
+  "feature",
+  "metadata",
+  "name",
+  "pval",
+  "pval_abundance",
+  "pval_presence",
+  "qval",
+  "qval_abundance",
+  "qval_presence",
+  "stderr",
+  "stderr_abundance",
+  "stderr_presence",
+  "tweedie.index",
+  "value",
+  "xnames"
+))

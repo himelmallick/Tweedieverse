@@ -4,8 +4,8 @@ get_AICtab<-function(fit){
   # Flag invalid options #
   ########################
   
-  if (!class(fit) %in% c('cpglm', 'zcpglm', 'glmmTMB')){
-    stop('Not supported. Valid options are cplm , zcpglm, and glmmTMB')
+  if (!inherits(fit, c("cpglm", "glmmTMB"))) {
+    stop('Not supported. Valid options are cpglm and glmmTMB')
   }
   
   ######################
@@ -18,7 +18,7 @@ get_AICtab<-function(fit){
   # Case-by-Case Extraction #
   ###########################
   
-  if (class(fit)=='cpglm'){
+  if (inherits(fit, "cpglm")) {
     
     ##########################################
     # Back calculate logLik and BIC from AIC #
@@ -36,26 +36,7 @@ get_AICtab<-function(fit){
     AICtab<-c(AIC, BIC, logLik, deviance, df.resid)
   }
   
-  if (class(fit)=='zcpglm'){
-    
-    ##########################################
-    # Back calculate AIC and BIC from logLik #
-    ##########################################
-    
-    logLik<--fit$llik
-    AIC_multiplier<-length(fit$y) - fit$df.residual
-    BIC_multiplier<-AIC_multiplier*log(length(fit$y))
-    AIC<-2*AIC_multiplier + 2*logLik
-    BIC<-BIC_multiplier + 2*logLik
-    deviance<-NA
-    df.resid<-fit$df.residual
-    
-    # Coherent output
-    AICtab<-c(AIC, BIC, logLik, deviance, df.resid)
-    
-  }
-  
-  if (class(fit)=='glmmTMB'){
+  if (inherits(fit, "glmmTMB")) {
     
     #######################################
     # Extract AICtab from glmmTMB objects #
@@ -78,6 +59,14 @@ get_AICtab<-function(fit){
 
 # Adapted form: https://rstudio-pubs-static.s3.amazonaws.com/455435_30729e265f7a4d049400d03a18e218db.html
 
+#' Entropy of a Vector
+#'
+#' Compute Shannon entropy for a vector.
+#'
+#' @param target A vector of values.
+#' @return A numeric entropy value.
+#' @examples
+#' entropy(c("A", "A", "B", "B", "C"))
 #' @export
 entropy <- function(target) {
   #if(all(is.na(target)))  0 
@@ -96,13 +85,14 @@ IG_numeric<-function(data, feature, target, bins=4) {
   #compute entropy for the parent
   e0<-entropy(data[,target])
   
-  data$cat<-cut(data[,feature], breaks=bins, labels=c(1:bins))
+  data$cat<-cut(data[,feature], breaks = bins, labels = seq_len(bins))
   
   #use dplyr to compute e and p for each value of the feature
-  dd_data <- data %>% group_by(cat) %>% summarise(e=entropy(get(target)), 
-                                                  n=length(get(target)),
-                                                  min=min(get(feature)),
-                                                  max=max(get(feature))
+  dd_data <- data %>% dplyr::group_by(cat) %>% dplyr::summarise(
+    e = entropy(get(target)),
+    n = length(get(target)),
+    min = min(get(feature)),
+    max = max(get(feature))
   )
   
   #calculate p for each value of feature
@@ -120,8 +110,9 @@ IG_cat<-function(data,feature,target){
   #Strip out rows where feature is NA
   data<-data[!is.na(data[,feature]),] 
   #use dplyr to compute e and p for each value of the feature
-  dd_data <- data %>% group_by_at(feature) %>% summarise(e=entropy(get(target)), 
-                                                         n=length(get(target))
+  dd_data <- data %>% dplyr::group_by_at(feature) %>% dplyr::summarise(
+    e = entropy(get(target)),
+    n = length(get(target))
   )
   
   #compute entropy for the parent
@@ -154,11 +145,54 @@ IG_cat<-function(data,feature,target){
 
 
 # Written by Grace
+read_input_table <- function(path) {
+  utils::read.delim(
+    path,
+    header = TRUE,
+    sep = "\t",
+    fill = TRUE,
+    comment.char = "",
+    check.names = FALSE,
+    row.names = 1
+  )
+}
+
+merge_method_args <- function(defaults, overrides) {
+  if (is.null(overrides)) {
+    return(defaults)
+  }
+  if (!is.list(overrides)) {
+    stop("Method-specific arguments must be provided as a list.")
+  }
+  utils::modifyList(defaults, overrides, keep.null = TRUE)
+}
+
+extract_method_args <- function(method_args, method) {
+  if (is.null(method_args)) {
+    return(list())
+  }
+  if (!is.list(method_args)) {
+    stop("method_args must be NULL or a named list.")
+  }
+
+  candidates <- c(method, tolower(method))
+  for (candidate in candidates) {
+    if (!is.null(method_args[[candidate]])) {
+      if (!is.list(method_args[[candidate]])) {
+        stop(sprintf("method_args$%s must be a list.", candidate))
+      }
+      return(method_args[[candidate]])
+    }
+  }
+
+  list()
+}
+
 extractAssay <- function(input, assay_name = "counts") {
   
   # Extract assay name based on the user input
-  if ("counts" %in% assayNames(input)) {
-    counts_data <- assay(input, assay_name)
+  if (assay_name %in% SummarizedExperiment::assayNames(input)) {
+    counts_data <- SummarizedExperiment::assay(input, assay_name)
     cat("The specified assay has been extracted\n")
     return(as.data.frame(as.matrix(counts_data)))
   } else {
@@ -171,7 +205,7 @@ extractAssay <- function(input, assay_name = "counts") {
 #' Median Comparison for Compositionality Adjustment
 #'
 #' Adjust Tweedieverse(or any other differential analysis methods) coefficient estimates and p-values by testing each taxon
-#' against the *median* effect for the same metadata variable — a simple
+#' against the *median* effect for the same metadata variable - a simple
 #' post-hoc strategy to curb false discoveries driven by the compositional
 #' nature of microbiome count data (after the approach adopted in **MaAsLin 3**).
 #'
@@ -196,11 +230,11 @@ extractAssay <- function(input, assay_name = "counts") {
 #' \enumerate{
 #'   \item keeps coefficients with `pval < p_cutoff` and computes their median;
 #'   \item simulates `n_sims` draws of coefficients using a normal
-#'         approximation (`N(effect_size, stderr²)`) and records the empirical
+#'         approximation (`N(effect_size, stderr^2)`) and records the empirical
 #'         distribution of the simulated medians;
 #'   \item derives a variance-inflated *offset* that accounts for the
 #'         covariance between each coefficient and the group median;
-#'   \item performs a two-sided Z-test of `H₀ : βᵢ = offsetᵢ`, returning the
+#'   \item performs a two-sided Z-test of `H0 : beta_i = offset_i`, returning the
 #'         resulting p-value in `pval_median`.
 #' }
 #'
@@ -220,6 +254,16 @@ extractAssay <- function(input, assay_name = "counts") {
 #' @seealso [MaAsLin 3 GitHub](https://github.com/biobakery/maaslin3)
 #'
 #' @examples
+#' toy <- data.frame(
+#'   taxon = c("tax1", "tax2"),
+#'   metadata = c("grp", "grp"),
+#'   effect_size = c(0.4, 0.2),
+#'   pval = c(0.01, 0.2),
+#'   stderr = c(0.1, 0.1),
+#'   qval = c(0.02, 0.25)
+#' )
+#' median_comparison_tweedie(toy, n_sims = 100)
+#'
 #' \dontrun{
 #' 
 #' ######################
@@ -298,7 +342,7 @@ median_comparison_tweedie <- function(df,
     }
     
     # 3) Compute the "group-wide" median of the usable coefficients
-    cur_median <- median(sub_df$effect_size[use_idx], na.rm = TRUE)
+    cur_median <- stats::median(sub_df$effect_size[use_idx], na.rm = TRUE)
     if (is.na(cur_median)) {
       # If no valid median, skip
       next
@@ -322,8 +366,8 @@ median_comparison_tweedie <- function(df,
     # 5) Simulate draws to approximate correlation of each coefficient w/ median
     #    sim_results has columns = draws, row 1 = simulated median, next rows = coefs
     sim_results <- replicate(n_sims, {
-      sim_coefs   <- rnorm(n_coefs, mean = coefs, sd = ses)
-      sim_median  <- median(sim_coefs[use_bool])
+      sim_coefs   <- stats::rnorm(n_coefs, mean = coefs, sd = ses)
+      sim_median  <- stats::median(sim_coefs[use_bool])
       c(sim_median, sim_coefs)
     })
     
@@ -331,10 +375,10 @@ median_comparison_tweedie <- function(df,
     all_sims    <- sim_results[-1, , drop = FALSE]  # row i => draws for coef i
     
     # Covariance of each coefficient with the median, across draws
-    cov_adjust <- apply(all_sims, 1, function(x) cov(x, sim_medians))
+    cov_adjust <- apply(all_sims, 1, function(x) stats::cov(x, sim_medians))
     
     # 6) "offset to test" for each coefficient, per the MaAsLin 3 approach:
-    #    offset_i = coefs[i] ± ... depends on difference from median & correlation
+    #    offset_i = coefs[i] +/- ... depends on difference from median & correlation
     median_sd <- sd(sim_medians)  # the empirical SD of the simulated median
     offsets_to_test <- abs(cur_median - coefs) *
       sqrt( (ses^2) / ( ses^2 + median_sd^2 - 2*cov_adjust ) ) + coefs
@@ -354,7 +398,7 @@ median_comparison_tweedie <- function(df,
       } else {
         # Normal approx. test for H0: coefs[i] == offsets_to_test[i]
         z_stat <- (coefs[i] - offsets_to_test[i]) / ses[i]
-        pvals_median[i] <- 2 * pnorm(abs(z_stat), lower.tail = FALSE)
+        pvals_median[i] <- 2 * stats::pnorm(abs(z_stat), lower.tail = FALSE)
       }
     }
     
@@ -365,4 +409,313 @@ median_comparison_tweedie <- function(df,
   
   # Return the augmented data
   return(df)
+}
+
+tweedieverse_cct <- function(pvals, weights = NULL) {
+  pvals <- ifelse(is.na(pvals), 1, pvals)
+
+  if (any(pvals < 0 | pvals > 1)) {
+    stop("All p-values must be between 0 and 1.")
+  }
+
+  if (any(pvals == 0) && any(pvals == 1)) {
+    stop("Cannot combine exact 0 and exact 1 p-values.")
+  }
+  if (any(pvals == 0)) {
+    return(0)
+  }
+  if (any(pvals == 1)) {
+    return(1)
+  }
+
+  if (is.null(weights)) {
+    weights <- rep(1 / length(pvals), length(pvals))
+  } else if (length(weights) != length(pvals)) {
+    stop("weights must have the same length as pvals.")
+  } else if (any(weights < 0)) {
+    stop("weights must be non-negative.")
+  } else {
+    weights <- weights / sum(weights)
+  }
+
+  is_small <- pvals < 1e-16
+  if (!any(is_small)) {
+    cct_stat <- sum(weights * tan((0.5 - pvals) * pi))
+  } else {
+    cct_stat <- sum((weights[is_small] / pvals[is_small]) / pi)
+    cct_stat <- cct_stat +
+      sum(weights[!is_small] * tan((0.5 - pvals[!is_small]) * pi))
+  }
+
+  if (cct_stat > 1e15) {
+    return((1 / cct_stat) / pi)
+  }
+  1 - stats::pcauchy(cct_stat)
+}
+
+tweedieverse_cct_rows <- function(mat) {
+  if (ncol(mat) == 1L) {
+    return(as.numeric(mat[, 1L]))
+  }
+  apply(mat, 1L, function(pv) tweedieverse_cct(as.numeric(pv)))
+}
+
+presence_augmentation_weight <- function(formula, data) {
+  rhs_formula <- stats::delete.response(stats::terms(formula))
+  n_predictors <- ncol(stats::model.matrix(rhs_formula, data = data))
+  n_predictors / (2 * nrow(data))
+}
+
+augment_presence_data <- function(formula,
+                                  data,
+                                  response = "expr",
+                                  weights = NULL) {
+  n_samples <- nrow(data)
+  if (is.null(weights)) {
+    weights <- rep(1, n_samples)
+  }
+  if (length(weights) != n_samples) {
+    stop("weights must have length equal to the number of samples.")
+  }
+
+  augmentation_weight <- presence_augmentation_weight(formula, data)
+  data_zero <- data
+  data_one <- data
+  data_zero[[response]] <- 0L
+  data_one[[response]] <- 1L
+
+  list(
+    data = rbind(data, data_zero, data_one),
+    weights = c(
+      weights,
+      rep(augmentation_weight, n_samples),
+      rep(augmentation_weight, n_samples)
+    )
+  )
+}
+
+fit_augmented_presence_model <- function(formula,
+                                         data,
+                                         has_random_effects = FALSE,
+                                         offset = NULL,
+                                         na.action = na.exclude) {
+  augmented <- augment_presence_data(formula = formula, data = data)
+  model_offset <- NULL
+  if (!is.null(offset)) {
+    if (length(offset) != nrow(data)) {
+      stop("offset must have length equal to the number of samples.")
+    }
+    model_offset <- rep(offset, 3L)
+  }
+
+  fit_fun <- if (has_random_effects) glmmTMB::glmmTMB else stats::glm
+  args <- list(
+    formula = formula,
+    family = stats::binomial(),
+    data = augmented$data,
+    weights = augmented$weights,
+    na.action = na.action
+  )
+  if (!is.null(model_offset)) {
+    args$offset <- model_offset
+  }
+
+  withCallingHandlers(
+    do.call(fit_fun, args),
+    warning = function(w) {
+      if (grepl("non-integer #successes in a binomial glm!",
+                conditionMessage(w),
+                fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
+fit_presence_absence_model <- function(features,
+                                       metadata,
+                                       formula,
+                                       random_effects_formula = NULL,
+                                       correction = "BH",
+                                       cores = 1,
+                                       na.action = na.exclude) {
+  if (!is.null(random_effects_formula) &&
+      !requireNamespace("glmmTMB", quietly = TRUE)) {
+    stop("glmmTMB is required for presence-absence models with random_effects.")
+  }
+
+  presence_formula <- formula
+  has_random_effects <- !is.null(random_effects_formula)
+  if (has_random_effects) {
+    fixed_terms <- setdiff(all.vars(formula)[-1], "offset")
+    formula_text <-
+      paste(". ~", paste(fixed_terms, collapse = " + "), ".", sep = " + ")
+    presence_formula <- stats::update(random_effects_formula, formula_text)
+  }
+
+  log_offset <- NULL
+  if ("offset" %in% colnames(metadata)) {
+    log_offset <- log(metadata$offset)
+  }
+
+  cluster <- NULL
+  if (cores > 1) {
+    logging::loginfo("Creating cluster of %s R processes for presence-absence models", cores)
+    cluster <- parallel::makeCluster(cores)
+    parallel::clusterExport(
+      cluster,
+      c(
+        "features",
+        "metadata",
+        "presence_formula",
+        "has_random_effects",
+        "log_offset",
+        "na.action",
+        "fit_augmented_presence_model",
+        "augment_presence_data",
+        "presence_augmentation_weight"
+      ),
+      envir = environment()
+    )
+  }
+
+  outputs <- pbapply::pblapply(seq_len(ncol(features)), cl = cluster, function(x) {
+    expr <- as.integer(features[, x] > 0)
+    data_sub <- data.frame(metadata, expr = expr)
+
+    if (length(unique(expr)) < 2L) {
+      para <- as.data.frame(matrix(NA_real_, nrow = ncol(metadata) - 1, ncol = 5))
+      para$name <- colnames(metadata)[-ncol(metadata)]
+    } else {
+      fit <- try(
+        fit_augmented_presence_model(
+          formula = presence_formula,
+          data = data_sub,
+          has_random_effects = has_random_effects,
+          offset = log_offset,
+          na.action = na.action
+        ),
+        silent = TRUE
+      )
+
+      if (!inherits(fit, "try-error")) {
+        summary_matrix <- if (has_random_effects) {
+          summary(fit)$coefficients$cond
+        } else {
+          stats::coef(summary(fit))
+        }
+        p_col <- intersect(c("Pr(>|z|)", "Pr(>|t|)"), colnames(summary_matrix))[1]
+        if (!is.na(p_col)) {
+          para <- as.data.frame(summary_matrix)[-1, c("Estimate", "Std. Error", p_col), drop = FALSE]
+          para$base.model <- "Presence-absence LR"
+          para$tweedie.index <- NA_real_
+          para$name <- rownames(summary_matrix)[-1]
+        } else {
+          para <- as.data.frame(matrix(NA_real_, nrow = ncol(metadata) - 1, ncol = 5))
+          para$name <- colnames(metadata)[-ncol(metadata)]
+        }
+      } else {
+        para <- as.data.frame(matrix(NA_real_, nrow = ncol(metadata) - 1, ncol = 5))
+        para$name <- colnames(metadata)[-ncol(metadata)]
+      }
+    }
+
+    colnames(para) <- c("coef", "stderr", "pval", "base.model", "tweedie.index", "name")
+    para$feature <- colnames(features)[x]
+    para
+  })
+
+  if (!is.null(cluster)) {
+    parallel::stopCluster(cluster)
+  }
+
+  paras <- do.call(rbind, outputs)
+  paras$qval <- as.numeric(stats::p.adjust(paras$pval, method = correction))
+
+  metadata_names <- setdiff(colnames(metadata), "offset")
+  metadata_names_ordered <- metadata_names[order(nchar(metadata_names), decreasing = TRUE)]
+  extract_metadata_name <- function(name) {
+    hit <- metadata_names_ordered[mapply(startsWith, name, metadata_names_ordered)][1]
+    if (is.na(hit)) {
+      return(name)
+    }
+    hit
+  }
+  paras$metadata <- unlist(lapply(paras$name, extract_metadata_name))
+  paras$value <- mapply(function(x, y) {
+    if (is.na(x) || is.na(y) || x == y) {
+      x
+    } else {
+      gsub(x, "", y)
+    }
+  }, paras$metadata, paras$name)
+  paras <- paras[order(paras$qval, decreasing = FALSE),]
+  paras <- dplyr::select(paras, c("feature", "metadata", "value"), dplyr::everything())
+  paras <- dplyr::select(paras, -name)
+  rownames(paras) <- NULL
+  paras
+}
+
+combine_abundance_presence_results <- function(abundance_results,
+                                               presence_results,
+                                               correction = "BH") {
+  abundance_keep <- dplyr::select(
+    abundance_results,
+    feature,
+    metadata,
+    value,
+    coef_abundance = coef,
+    stderr_abundance = stderr,
+    pval_abundance = pval,
+    qval_abundance = qval,
+    base.model_abundance = base.model,
+    tweedie.index
+  )
+  presence_keep <- dplyr::select(
+    presence_results,
+    feature,
+    metadata,
+    value,
+    coef_presence = coef,
+    stderr_presence = stderr,
+    pval_presence = pval,
+    qval_presence = qval,
+    base.model_presence = base.model
+  )
+
+  combined <- dplyr::left_join(
+    abundance_keep,
+    presence_keep,
+    by = c("feature", "metadata", "value")
+  )
+  pmat <- as.matrix(combined[, c("pval_abundance", "pval_presence"), drop = FALSE])
+  combined$pval <- tweedieverse_cct_rows(pmat)
+  combined$qval <- as.numeric(stats::p.adjust(combined$pval, method = correction))
+  combined$coef <- combined$coef_abundance
+  combined$stderr <- combined$stderr_abundance
+  combined$base.model <- "CCT"
+  combined <- dplyr::select(
+    combined,
+    feature,
+    metadata,
+    value,
+    coef,
+    stderr,
+    pval,
+    qval,
+    coef_abundance,
+    stderr_abundance,
+    pval_abundance,
+    qval_abundance,
+    coef_presence,
+    stderr_presence,
+    pval_presence,
+    qval_presence,
+    base.model,
+    base.model_abundance,
+    base.model_presence,
+    tweedie.index
+  )
+  rownames(combined) <- NULL
+  combined
 }
