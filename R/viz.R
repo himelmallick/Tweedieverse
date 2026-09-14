@@ -28,12 +28,13 @@
 # individual associations as scatterplot and boxplot
 #  Visualization results are provided as pdf and RDS format to be used with manuscript quality.
 
-# Load libraries
-for (lib in c('ggplot2', "grid", 'pheatmap', 'cowplot')) {
-  suppressPackageStartupMessages(require(lib, character.only = TRUE))
-}
-
-
+#' Omics-Eye Plot Theme
+#'
+#' A compact ggplot2 theme used by Tweedieverse visualization functions.
+#'
+#' @return A list of ggplot2 theme elements.
+#' @examples
+#' theme_omicsEye()
 #' @export
 theme_omicsEye <- function() list(
   cowplot::theme_cowplot(),
@@ -70,6 +71,32 @@ theme_omicsEye <- function() list(
 
 
 # Tweedieverse heatmap function for overall view of associations
+#' Plot a Tweedieverse Heatmap
+#'
+#' Create a heatmap summarizing association statistics from Tweedieverse
+#' results.
+#'
+#' @param output_results Tweedieverse result data frame or path to a TSV file.
+#' @param title Optional plot title.
+#' @param cell_value Which value to display (`"qval"`, `"pval"`, or `"coef"`).
+#' @param data_label Label for feature axis.
+#' @param metadata_label Label for metadata axis.
+#' @param border_color Heatmap border color.
+#' @param color Color palette function.
+#' @param col_rotate Rotation angle for column labels.
+#' @param first_n Number of top features to include.
+#' @param write_to Optional output directory for serialized plot objects.
+#' @return A `pheatmap` object or `NULL` when insufficient data are available.
+#' @examples
+#' toy <- data.frame(
+#'   feature = c("tax1", "tax2", "tax1", "tax2"),
+#'   metadata = c("grp", "grp", "time", "time"),
+#'   value = c("A", "B", "A", "B"),
+#'   pval = c(0.01, 0.05, 0.02, 0.03),
+#'   qval = c(0.02, 0.08, 0.03, 0.04),
+#'   coef = c(1.2, -0.7, 0.9, -0.4)
+#' )
+#' Tweedieverse_heatmap(toy, first_n = 2)
 #' @export
 Tweedieverse_heatmap <-
   function(output_results,
@@ -93,7 +120,7 @@ Tweedieverse_heatmap <-
         check.names = FALSE
       )
     } else {
-      data <- output_results
+      df <- output_results
     }
 
     title_additional <- ""
@@ -101,9 +128,9 @@ Tweedieverse_heatmap <-
     title_additional <- ""
     if (!is.na(first_n) & first_n > 0 & first_n < dim(df)[1]) {
       if (cell_value == 'coef') {
-        df <- df[order(-abs(df[cell_value])) ,]
+        df <- df[order(-abs(df[[cell_value]])) ,]
       } else{
-        df <- df[order(df[cell_value]),]
+        df <- df[order(df[[cell_value]]),]
       }
       # get the top n features with significant associations
       df_sub <- df[1:first_n, ]
@@ -312,51 +339,10 @@ association_plots <-
     # combine the data and metadata to one datframe using common rows
     # read Tweedieverse output
     if (is.character(features)) {
-      features <-
-        data.frame(
-          read.delim::fread(features, header = TRUE, sep = '\t'),
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      if (nrow(data) == 1) {
-        # read again to get row name
-        features <- read.delim(
-          features,
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      }
-    } else {
-      features <- features
+      features <- read_input_table(features)
     }
     if (is.character(metadata)) {
-      metadata <-
-        data.frame(
-          read.delim::fread(input_metadata, header = TRUE, sep = '\t'),
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      if (nrow(metadata) == 1) {
-        metadata <- read.delim(
-          input_metadata,
-          header = TRUE,
-          fill = T,
-          comment.char = "" ,
-          check.names = F,
-          row.names = 1
-        )
-      }
-    } else {
-      metadata <- metadata
+      metadata <- read_input_table(metadata)
     }
     common_rows <-
       intersect(rownames(features), rownames(metadata))
@@ -575,7 +561,7 @@ association_plots <-
 
       dev.off()
       # print the saved figures
-      for (plot_number in seq(1, max_jpgs)) {
+      for (plot_number in seq_len(max_jpgs)) {
         jpg_file <- file.path(figures_folder,
                               paste0(substr(
                                 basename(plot_file), 1, nchar(basename(plot_file)) - 4

@@ -7,7 +7,7 @@
 Tweedieverse(
   input_features,
   input_metadata = NULL,
-  output,
+  output = NULL,
   assay_name = "counts",
   abd_threshold = 0,
   prev_threshold = 0.1,
@@ -15,16 +15,19 @@ Tweedieverse(
   entropy_threshold = 0,
   base_model = "CPLM",
   link = "log",
+  tweedie_p = NULL,
   fixed_effects = NULL,
   random_effects = NULL,
-  cutoff_ZSCP = 0.3,
-  criteria_ZACP = "BIC",
   adjust_offset = TRUE,
   scale_factor = NULL,
   max_significance = 0.05,
   correction = "BH",
-  median_comparison = TRUE,
+  Maaslin2_run = TRUE,
+  median_comparison = FALSE,
   median_subtraction = FALSE,
+  run_presence_absence_model = FALSE,
+  method_args = NULL,
+  method.args = NULL,
   standardize = TRUE,
   cores = 1,
   optimizer = "nlminb",
@@ -74,20 +77,21 @@ Default value for \code{var_threshold} is \code{0.0} (i.e. no variance filtering
 \item{entropy_threshold}{If entropy-based filtering is desired for metadata, only features that have entropy greater than
 \code{entropy_threshold} are retained. Default value for \code{entropy_threshold} is \code{0.0} (i.e. no entropy filtering).}
 
-\item{base_model}{The per-feature base model. Default is "CPLM". Must be one of "CPLM", "ZICP", "ZSCP", or "ZACP".}
+\item{base_model}{The per-feature base model. Only "CPLM" is supported.}
 
 \item{link}{A specification of the GLM link function. Default is "log". Must be one of "log", "identity", "sqrt", or "inverse".}
+
+\item{tweedie_p}{Numeric Tweedie variance power. Default is \code{NULL}, which estimates the compound-Poisson
+Tweedie index in the usual \code{1 < p < 2} range when all filtered feature values are non-negative.
+If \code{tweedie_p} is \code{NULL} or \code{NA} and filtered features contain negative values, it is resolved
+to \code{0}, the Gaussian case. Values between 0 and 1 are undefined and rejected. Other supplied values
+pin the model to that fixed index. Negative supplied powers are allowed with a warning for non-negative data,
+but negative feature values are supported only at \code{p = 0}.
+Random-effect models support fixed \code{p = 0}, \code{p = 1}, \code{1 < p < 2}, \code{p = 2}, and \code{p = 3}.}
 
 \item{fixed_effects}{Metadata variable(s) describing the fixed effects coefficients.}
 
 \item{random_effects}{Metadata variable(s) describing the random effects part of the model.}
-
-\item{cutoff_ZSCP}{For \code{base_model = "ZSCP"}, the cutoff to stratify features for
-adaptive ZI modeling based on sparsity (zero-inflation proportion). Default is 0.3. Must be between 0 and 1.}
-
-\item{criteria_ZACP}{For \code{base_model = "ZACP"}, the criteria to select the
-best fitting model per feature.  The possible options are 'AIC' and BIC' (default).
-More criteria will be supported in a future release.}
 
 \item{adjust_offset}{If TRUE (default), an offset term will be included as the logarithm of \code{scale_factor}.}
 
@@ -99,9 +103,25 @@ If not found in metadata, defaults to the sample-wise total sums, unless \code{a
 
 \item{correction}{The correction method for computing the q-value (see \code{\link[stats]{p.adjust}} for options, default is 'BH').}
 
-\item{median_comparison}{If TRUE(default), coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Should only be used for relative abundance data.}
+\item{Maaslin2_run}{Logical. For \code{tweedie_p = 0}, run the MaAsLin2 linear-model path instead of the
+Tweedie GLM path. Set to FALSE to fit \code{tweedie_p = 0} with the Tweedie GLM. Default is TRUE.
+When the resolved Tweedie index is \code{0}, non-identity links are changed to \code{"identity"} and
+\code{adjust_offset} is disabled.}
+
+\item{median_comparison}{If TRUE, coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Default is FALSE. Should only be used for relative abundance data.}
 
 \item{median_subtraction}{If TRUE, coefficients minus median will be used for compositionality adjustment.}
+
+\item{run_presence_absence_model}{If TRUE, also fit a DAssemble-style presence-absence logistic regression model
+alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
+Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
+of the two p-values. Default is FALSE.}
+
+\item{method_args}{Optional named list of method-specific arguments. For \code{tweedie_p = 0}, use
+\code{method_args = list(Maaslin2 = list(...))} to pass arguments to \code{\link[Maaslin2]{Maaslin2}};
+user-supplied values override Tweedieverse defaults.}
+
+\item{method.args}{Alias for \code{method_args}.}
 
 \item{standardize}{Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.}
 
@@ -130,203 +150,47 @@ Fit a per-feature Tweedie generalized linear model to omics features.
 }
 \examples{
 
+set.seed(123)
+features <- as.data.frame(matrix(rpois(24, lambda = 5), nrow = 12, ncol = 2))
+colnames(features) <- c("feature1", "feature2")
+rownames(features) <- paste0("sample", seq_len(nrow(features)))
+metadata <- data.frame(
+  group = rep(c("A", "B"), each = 6),
+  row.names = rownames(features)
+)
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  output = NULL,
+  fixed_effects = "group",
+  median_comparison = FALSE,
+  cores = 1
+)
+head(fit)
+
 \dontrun{
-
-##############################################################################
-# Example 1 - Differential Abundance Analysis of Synthetic Microbiome Counts #
-##############################################################################
-
-#######################################
-# Install and Load Required Libraries #
-#######################################
-
-library(devtools)
-devtools::install_github('biobakery/sparseDOSSA@varyLibSize')
-library(sparseDOSSA)
-library(stringi)
-
-######################
-# Specify Parameters #
-######################
-
-n.microbes <- 200 # Number of Features
-n.samples <- 100 # Number of Samples
-spike.perc <- 0.02 # Percentage of Spiked-in Bugs
-spikeStrength<-"20" # Effect Size
-
-###########################
-# Specify Binary Metadata #
-###########################
-
-n.metadata <- 1
-UserMetadata<-as.matrix(rep(c(0,1), each=n.samples/2))
-UserMetadata<-t(UserMetadata) # Transpose
-
-###################################################
-# Spiked-in Metadata (Which Metadata to Spike-in) #
-###################################################
-
-Metadatafrozenidx<-1
-spikeCount<-as.character(length(Metadatafrozenidx))
-significant_metadata<-paste('Metadata', Metadatafrozenidx, sep='')
-
-#############################################
-# Generate SparseDOSSA Synthetic Abundances #
-#############################################
-
-DD<-sparseDOSSA::sparseDOSSA(number_features = n.microbes,
-number_samples = n.samples,
-UserMetadata=UserMetadata,
-Metadatafrozenidx=Metadatafrozenidx,
-datasetCount = 1,
-spikeCount = spikeCount,
-spikeStrength = spikeStrength,
-noZeroInflate=TRUE,
-percent_spiked=spike.perc,
-seed = 1234)
-
-##############################
-# Gather SparseDOSSA Outputs #
-##############################
-
-sparsedossa_results <- as.data.frame(DD$OTU_count)
-rownames(sparsedossa_results)<-sparsedossa_results$X1
-sparsedossa_results<-sparsedossa_results[-1,-1]
-colnames(sparsedossa_results)<-paste('Sample', 1:ncol(sparsedossa_results), sep='')
-data<-as.matrix(sparsedossa_results[-c((n.metadata+1):(2*n.microbes+n.metadata)),])
-data<-data.matrix(data)
-class(data) <- "numeric"
-truth<-c(unlist(DD$truth))
-truth<-truth[!stri_detect_fixed(truth,":")]
-truth<-truth[(5+n.metadata):length(truth)]
-truth<-as.data.frame(truth)
-significant_features<-truth[seq(1,
-(as.numeric(spikeCount)+1)*(n.microbes*spike.perc), (as.numeric(spikeCount)+1)),]
-significant_features<-as.vector(significant_features)
-
-####################
-# Extract Features #
-####################
-
-features<-as.data.frame(t(data[-c(1:n.metadata),]))
-
-####################
-# Extract Metadata #
-####################
-
-metadata<-as.data.frame(data[1,])
-colnames(metadata)<-rownames(data)[1]
-
-###############################
-# Mark True Positive Features #
-###############################
-
-wh.TP = colnames(features) \%in\% significant_features
-colnames(features)<-paste("Feature", 1:n.microbes, sep = "")
-newname = paste0(colnames(features)[wh.TP], "_TP")
-colnames(features)[wh.TP] <- newname;
-colnames(features)[grep('TP', colnames(features))]
-
-####################
-# Run Tweedieverse #
-###################
-
-###################
-# Default options #
-###################
-
-CPLM <-Tweedieverse(
-features,
-metadata,
-output = './demo_output/CPLM') # Assuming demo_output exists
-
-###############################################
-# User-defined prevalence-abundance filtering #
-###############################################
-
-ZICP<-Tweedieverse(
-features,
-metadata,
-output = './demo_output/ZICP', # Assuming demo_output exists
-base_model = 'ZICP',
-abd_threshold = 0.0,
-prev_threshold = 0.2)
-
-####################################
-# User-defined variance filtering  #
-####################################
-
-sds<-apply(features, 2, sd)
-var_threshold = median(sds)/2
-ZSCP<-Tweedieverse(
-features,
-metadata,
-output = './demo_output/ZSCP', # Assuming demo_output exists
-base_model = 'ZSCP',
-var_threshold = var_threshold)
-
-##################
-# Multiple cores #
-##################
-
-ZACP<-Tweedieverse(
-features,
-metadata,
-output = './demo_output/ZACP', # Assuming demo_output exists
-base_model = 'ZACP',
-cores = 4)
-
-##########################################################################
-# Example 2 - Multivariable Association on HMP2 Longitudinal Microbiomes #
-##########################################################################
-
-######################
-# HMP2 input_features Analysis #
-######################
-
-#############
-# Load input_features #
-#############
-
-library(data.table)
-input_features <- fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_taxonomy.tsv", sep ="\t")
-input_metadata <-fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv", sep ="\t")
-
-###############
-# Format data #
-###############
-
-library(tibble)
-features<- column_to_rownames(input_features, 'ID')
-metadata<- column_to_rownames(input_metadata, 'ID')
-
-#############
-# Fit Model #
-#############
-
-library(Tweedieverse)
-HMP2 <- Tweedieverse(
-features,
-metadata,
-output = './demo_output/HMP2', # Assuming demo_output exists
-fixed_effects = c('diagnosis', 'dysbiosisnonIBD','dysbiosisUC','dysbiosisCD', 'antibiotics', 'age'),
-random_effects = c('site', 'subject'),
-base_model = 'CPLM',
-adjust_offset = FALSE, # No offset as the values are relative abundances
-cores = 8, # Make sure your computer has the capability
-median_comparison = TRUE,
-median_subtraction = TRUE,
-standardize = FALSE,
-reference = c('diagnosis,nonIBD'))
-
+maaslin2_median_fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  output = NULL,
+  fixed_effects = "group",
+  tweedie_p = 0,
+  Maaslin2_run = TRUE,
+  median_comparison = TRUE,
+  median_subtraction = TRUE,
+  cores = 1
+)
 }
+
+# For a full iHMP workflow example, see:
+# vignette("Tweedieverse-vignette", package = "Tweedieverse")
 }
 \author{
 Himel Mallick, \email{him4004@med.cornell.edu}
 }
-\keyword{metagenomics,}
-\keyword{microbiome,}
-\keyword{multiomics,}
-\keyword{scRNASeq,}
+\keyword{metagenomics}
+\keyword{microbiome}
+\keyword{multiomics}
+\keyword{scRNASeq}
 \keyword{singlecell}
-\keyword{tweedie,}
+\keyword{tweedie}
