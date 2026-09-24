@@ -303,8 +303,7 @@ Basic Usage
 library(Tweedieverse)
 
 fit <- Tweedieverse(
-  input_features = features,
-  input_metadata = metadata,
+  input_features = experiment,
   output = NULL,
   fixed_effects = "group",
   cores = 1
@@ -325,9 +324,13 @@ metadata <- data.frame(
   row.names = rownames(features)
 )
 
+experiment <- SummarizedExperiment::SummarizedExperiment(
+  assays = list(counts = t(as.matrix(features))),
+  colData = metadata
+)
+
 fit <- Tweedieverse(
-  input_features = features,
-  input_metadata = metadata,
+  input_features = experiment,
   output = NULL,
   fixed_effects = "group",
   tweedie_p = 1,
@@ -342,14 +345,12 @@ head(fit)
 Input
 -----
 
-Tweedieverse requires a feature table and a metadata table.
+Tweedieverse requires a Bioconductor experiment container.
 
-The feature table should contain samples and omics features such as taxa, genes, transcripts, pathways, metabolites, or peaks. The metadata table should contain the sample-level variables to test. Sample identifiers must overlap between the two inputs; Tweedieverse will align the tables before fitting models.
+The assay should contain omics features such as taxa, genes, transcripts, pathways, metabolites, or peaks. The container's `colData` should contain the sample-level variables to test. Sample identifiers must overlap between the assay and metadata; Tweedieverse will align them before fitting models.
 
 `input_features` can be:
 
-- a data frame,
-- a tab-delimited file path,
 - a domain-appropriate Bioconductor container,
 - a `MultiAssayExperiment` containing multiple omics layers.
 
@@ -362,7 +363,7 @@ The domain-specific Bioconductor container expectations are:
 | `bulk_rnaseq` | `SummarizedExperiment` |
 | `custom` | any supported SummarizedExperiment-like container |
 
-When a Bioconductor object is supplied, `assay_name` selects the assay to use, and `colData` is used as metadata unless `input_metadata` is provided separately.
+When a Bioconductor object is supplied, `assay_name` selects the assay to use, and `colData` is used as metadata unless `input_metadata` is provided separately as a data frame. Plain feature data frames, matrices, lists, and file paths are not accepted as `input_features`.
 
 ### Multi-omics input with `MultiAssayExperiment`
 

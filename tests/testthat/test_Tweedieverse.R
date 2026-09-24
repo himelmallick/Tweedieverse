@@ -13,6 +13,13 @@ SEdata <- list(feature = featureInfo, group = groupInfo)
 
 expect_error(Tweedieverse(SEdata))
 
+make_test_se <- function(features, metadata) {
+  SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = t(as.matrix(features))),
+    colData = metadata
+  )
+}
+
 test_that("size-factor normalization does not modify feature data", {
   features <- data.frame(
     feature1 = c(10, 20, 30),
@@ -182,8 +189,7 @@ test_that("Tweedieverse keeps input data unchanged when normalization is selecte
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     domain = "bulk_rnaseq",
@@ -239,8 +245,7 @@ test_that("p equals 0 transformation is used for the analysis copy and written t
 
   suppressWarnings(
     fit <- Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = output,
       fixed_effects = "group",
       tweedie_p = 0,
@@ -272,8 +277,7 @@ test_that("fixed Tweedie p values are supported for fixed-effect GLMs", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 1,
@@ -302,8 +306,7 @@ test_that("undefined Tweedie p values between 0 and 1 are rejected", {
 
   expect_error(
     Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = NULL,
       fixed_effects = "group",
       tweedie_p = 0.5,
@@ -325,8 +328,7 @@ test_that("NA Tweedie p is treated as unspecified", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = NA,
@@ -354,8 +356,7 @@ test_that("unspecified p with negative features resolves to p equals 0", {
 
   expect_message(
     fit <- Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = NULL,
       fixed_effects = "group",
       tweedie_p = NULL,
@@ -384,8 +385,7 @@ test_that("negative feature values are rejected for positive Tweedie powers", {
 
   expect_error(
     Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = NULL,
       fixed_effects = "group",
       tweedie_p = 1,
@@ -411,8 +411,7 @@ test_that("negative supplied Tweedie p warns but runs for non-negative data", {
 
   expect_warning(
     fit <- Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = NULL,
       fixed_effects = "group",
       tweedie_p = -1,
@@ -441,8 +440,7 @@ test_that("presence-absence model adds individual and CCT results", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 1,
@@ -477,8 +475,7 @@ test_that("p equals 0 uses the MaAsLin2 linear-model path", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
@@ -505,8 +502,7 @@ test_that("presence-absence model can combine with the MaAsLin2 p equals 0 path"
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
@@ -542,8 +538,7 @@ test_that("p equals 0 can run through the Tweedie GLM when Maaslin2_run is FALSE
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
@@ -571,8 +566,7 @@ test_that("MaAsLin2 method_args are accepted for the p equals 0 path", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
@@ -604,8 +598,7 @@ test_that("method.args is an alias but cannot be mixed with method_args", {
   )
 
   fit <- Tweedieverse(
-    input_features = features,
-    input_metadata = metadata,
+    input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
@@ -623,8 +616,7 @@ test_that("method.args is an alias but cannot be mixed with method_args", {
   expect_true(nrow(fit) > 0)
   expect_error(
     Tweedieverse(
-      input_features = features,
-      input_metadata = metadata,
+      input_features = make_test_se(features, metadata),
       output = NULL,
       fixed_effects = "group",
       tweedie_p = 0,

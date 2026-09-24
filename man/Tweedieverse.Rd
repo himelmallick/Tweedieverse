@@ -43,9 +43,7 @@ Tweedieverse(
 )
 }
 \arguments{
-\item{input_features}{A tab-delimited input file or an R data frame of features (can be in rows/columns)
-and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
-\code{input_features} can also be a domain-appropriate Bioconductor container, such as
+\item{input_features}{A domain-appropriate Bioconductor container, such as
 \code{TreeSummarizedExperiment} for \code{domain = "microbiome"},
 \code{SingleCellExperiment} for \code{domain = "single_cell"}, and
 \code{SummarizedExperiment} for \code{domain = "bulk_rnaseq"}. The \code{assays} slot contains the expression
@@ -59,10 +57,9 @@ sample and columns that contain metadata for each sample.
 Additional information about the experiment can be contained in the
 \code{metadata} slot as a list.}
 
-\item{input_metadata}{A tab-delimited input file or an R data frame of metadata (rows/columns).
-Samples are expected to have matching sample names with \code{input_features}. 
-This file is ignored when \code{input_features} is a supported Bioconductor
-container with \code{colData} containing the same information.}
+\item{input_metadata}{Optional R data frame of metadata. Samples are expected to have
+matching sample names with \code{input_features}. If \code{NULL}, metadata are taken from
+the Bioconductor container's \code{colData}.}
 
 \item{output}{The output folder to write results.}
 
@@ -190,9 +187,12 @@ metadata <- data.frame(
   group = rep(c("A", "B"), each = 6),
   row.names = rownames(features)
 )
+experiment <- SummarizedExperiment::SummarizedExperiment(
+  assays = list(counts = t(as.matrix(features))),
+  colData = metadata
+)
 fit <- Tweedieverse(
-  input_features = features,
-  input_metadata = metadata,
+  input_features = experiment,
   output = NULL,
   fixed_effects = "group",
   median_comparison = FALSE,
@@ -202,8 +202,7 @@ head(fit)
 
 \dontrun{
 maaslin2_median_fit <- Tweedieverse(
-  input_features = features,
-  input_metadata = metadata,
+  input_features = experiment,
   output = NULL,
   fixed_effects = "group",
   tweedie_p = 0,

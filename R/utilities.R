@@ -267,7 +267,7 @@ validate_domain_bioc_container <- function(input, domain) {
         "For domain =", domain,
         "Bioconductor input must inherit from one of:",
         paste(allowed, collapse = ", "),
-        ". Use a data.frame/file path for domain-agnostic input."
+        ". Plain data frames, matrices, lists, and file paths are not supported as input_features."
       )
     )
   }
@@ -328,17 +328,14 @@ extract_multiassay_metadata <- function(input, input_metadata = NULL) {
 
 coerce_multiassay_experiment_input <- function(experiment) {
   valid_classes <- unique(unlist(domain_bioc_container_map()))
-  if (inherits(experiment, valid_classes) || is.data.frame(experiment)) {
+  if (inherits(experiment, valid_classes)) {
     return(experiment)
-  }
-  if (is.matrix(experiment)) {
-    return(as.data.frame(experiment))
   }
   stop(
     sprintf(
       paste(
         "MultiAssayExperiment experiment of class <%s> is not supported.",
-        "Use SummarizedExperiment-like experiments, matrices, or data.frames."
+        "Use domain-appropriate Bioconductor experiments only."
       ),
       class(experiment)[1]
     )

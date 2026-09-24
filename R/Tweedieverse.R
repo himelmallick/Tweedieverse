@@ -2,9 +2,7 @@
 #'
 #' Fit a per-feature Tweedie generalized linear model to omics features.
 
-#' @param input_features A tab-delimited input file or an R data frame of features (can be in rows/columns)
-#' and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
-#' \code{input_features} can also be a domain-appropriate Bioconductor container, such as
+#' @param input_features A domain-appropriate Bioconductor container, such as
 #' \code{TreeSummarizedExperiment} for \code{domain = "microbiome"},
 #' \code{SingleCellExperiment} for \code{domain = "single_cell"}, and
 #' \code{SummarizedExperiment} for \code{domain = "bulk_rnaseq"}. The \code{assays} slot contains the expression
@@ -17,10 +15,9 @@
 #' sample and columns that contain metadata for each sample. 
 #' Additional information about the experiment can be contained in the
 #' \code{metadata} slot as a list.
-#' @param input_metadata A tab-delimited input file or an R data frame of metadata (rows/columns).
-#' Samples are expected to have matching sample names with \code{input_features}. 
-#' This file is ignored when \code{input_features} is a supported Bioconductor
-#' container with \code{colData} containing the same information.
+#' @param input_metadata Optional R data frame of metadata. Samples are expected to have
+#' matching sample names with \code{input_features}. If \code{NULL}, metadata are taken from
+#' the Bioconductor container's \code{colData}.
 #' @param output The output folder to write results.
 #' @param assay_name If the input is provided as one of the accepted Bioconductor objects,
 #' this argument selects the name of the assay slot in the input object that contains the omics measurements.
@@ -119,9 +116,12 @@
 #'   group = rep(c("A", "B"), each = 6),
 #'   row.names = rownames(features)
 #' )
+#' experiment <- SummarizedExperiment::SummarizedExperiment(
+#'   assays = list(counts = t(as.matrix(features))),
+#'   colData = metadata
+#' )
 #' fit <- Tweedieverse(
-#'   input_features = features,
-#'   input_metadata = metadata,
+#'   input_features = experiment,
 #'   output = NULL,
 #'   fixed_effects = "group",
 #'   median_comparison = FALSE,
@@ -131,8 +131,7 @@
 #' 
 #' \dontrun{
 #' maaslin2_median_fit <- Tweedieverse(
-#'   input_features = features,
-#'   input_metadata = metadata,
+#'   input_features = experiment,
 #'   output = NULL,
 #'   fixed_effects = "group",
 #'   tweedie_p = 0,
@@ -182,6 +181,31 @@ Tweedieverse <- function(input_features,
                          plot_scatter = FALSE,
                          heatmap_first_n = 50,
                          reference = NULL) {
+  valid_input_classes <- c(
+    "MultiAssayExperiment",
+    unique(unlist(domain_bioc_container_map()))
+  )
+  if (!inherits(input_features, valid_input_classes)) {
+    stop(
+      paste(
+        "input_features must be a supported Bioconductor container:",
+        paste(valid_input_classes, collapse = ", "),
+        ". Plain data frames, matrices, lists, and file paths are not supported."
+      ),
+      call. = FALSE
+    )
+  }
+  if (is.character(input_metadata)) {
+    stop(
+      paste(
+        "input_metadata file paths are not supported.",
+        "Use colData(input_features), colData on a MultiAssayExperiment,",
+        "or provide input_metadata as a data.frame."
+      ),
+      call. = FALSE
+    )
+  }
+
   if (inherits(input_features, "MultiAssayExperiment")) {
     return(run_multiassay_tweedieverse(
       input_features = input_features,
@@ -346,39 +370,16 @@ Tweedieverse <- function(input_features,
     } else {
       metadata <- input_metadata
     }
-  } else if (!(is.character(input_features)) && !(is.data.frame(input_features))) {
+  } else {
     stop(
       sprintf(
         paste(
           "Input data of class <%s> not supported.",
-          "Please use a domain-appropriate Bioconductor container,",
-          "a data.frame, or a tab-delimited file path."
+          "Please use a domain-appropriate Bioconductor container."
         ),
         class(input_features)[1]
       )
     )
-  } else {
-    
-    # if a character string then this is a file name, else it
-    # is a data frame
-    if (is.character(input_features)) {
-      data <- read_input_table(input_features)
-    } else {
-      data <- input_features
-    }
-    if (is.character(input_metadata)) {
-      metadata <- read_input_table(input_metadata)
-    } else {
-      metadata <- input_metadata
-    }
-    if (is.null(metadata)) {
-      stop(
-        paste(
-          "input_metadata must be provided when input_features is not",
-          "a SummarizedExperiment-like object."
-        )
-      )
-    }
   }
     
   # create an output folder and figures folder if it does not exist
