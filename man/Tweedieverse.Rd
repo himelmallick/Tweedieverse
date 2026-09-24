@@ -16,8 +16,12 @@ Tweedieverse(
   base_model = "CPLM",
   link = "log",
   tweedie_p = NULL,
+  p0_transform = "NONE",
+  p0_transform_pseudocount = 1,
   fixed_effects = NULL,
   random_effects = NULL,
+  domain = "microbiome",
+  normalization = NULL,
   adjust_offset = TRUE,
   scale_factor = NULL,
   max_significance = 0.05,
@@ -41,10 +45,15 @@ Tweedieverse(
 \arguments{
 \item{input_features}{A tab-delimited input file or an R data frame of features (can be in rows/columns)
 and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
-\code{input_features} can also be an object of class \code{SummarizedExperiment} or \code{SingleCellExperiment} 
-that contains the expression or abundance matrix and other metadata; the \code{assays} 
-slot contains the expression or abundance matrix and is named \code{"counts"}.  
-This matrix should have one row for each feature and one sample for each column.  
+\code{input_features} can also be a domain-appropriate Bioconductor container, such as
+\code{TreeSummarizedExperiment} for \code{domain = "microbiome"},
+\code{SingleCellExperiment} for \code{domain = "single_cell"}, and
+\code{SummarizedExperiment} for \code{domain = "bulk_rnaseq"}. The \code{assays} slot contains the expression
+or abundance matrix and defaults to an assay named \code{"counts"}.
+A \code{MultiAssayExperiment} object is also accepted. In that case,
+\code{Tweedieverse()} iterates over each experiment/omics layer and returns a named
+list of omics-specific results.
+This matrix should have one row for each feature and one sample for each column.
 The \code{colData} slot should contain a data frame with one row per 
 sample and columns that contain metadata for each sample. 
 Additional information about the experiment can be contained in the
@@ -52,14 +61,15 @@ Additional information about the experiment can be contained in the
 
 \item{input_metadata}{A tab-delimited input file or an R data frame of metadata (rows/columns).
 Samples are expected to have matching sample names with \code{input_features}. 
-This file is ignored when \code{input_features} is a \code{SummarizedExperiment} 
-or a \code{SingleCellExperiment} object with \code{colData} containing the same information.}
+This file is ignored when \code{input_features} is a supported Bioconductor
+container with \code{colData} containing the same information.}
 
 \item{output}{The output folder to write results.}
 
-\item{assay_name}{If the input is provided as one of the accepted Bioconductor objects 
-(e.g., SummarizedExperiment, RangedSummarizedExperiment, SingleCellExperiment, or TreeSummarizedExperiment), 
-this argument selects the name of the assay slot in the input object that contains the omics measurements.}
+\item{assay_name}{If the input is provided as one of the accepted Bioconductor objects,
+this argument selects the name of the assay slot in the input object that contains the omics measurements.
+For \code{MultiAssayExperiment} input, most arguments can be supplied as a single value
+used for every omics layer, or as a named list/vector keyed by experiment name.}
 
 \item{abd_threshold}{If prevalence-abundance filtering is desired, only features that are present (or detected)
 in at least \code{prev_threshold} percent of samples at \code{abd_threshold} minimum abundance (read count or proportion)
@@ -89,15 +99,35 @@ pin the model to that fixed index. Negative supplied powers are allowed with a w
 but negative feature values are supported only at \code{p = 0}.
 Random-effect models support fixed \code{p = 0}, \code{p = 1}, \code{1 < p < 2}, \code{p = 2}, and \code{p = 3}.}
 
+\item{p0_transform}{Transformation to apply to a copy of the filtered feature table when the
+resolved Tweedie index is \code{0}. The original input data are not modified. Must be one of
+\code{"NONE"}, \code{"CLR"}, \code{"RCLR"}, \code{"LOG"}, or \code{"ARC_SIGNED_SQRT"}.
+The transformed copy is used for the \code{p = 0} abundance model and written to
+\code{transformed_features.tsv} when \code{output} is provided. Default is \code{"NONE"}.}
+
+\item{p0_transform_pseudocount}{Numeric pseudocount used for \code{p0_transform = "CLR"} and
+\code{p0_transform = "LOG"}. Default is 1.}
+
 \item{fixed_effects}{Metadata variable(s) describing the fixed effects coefficients.}
 
 \item{random_effects}{Metadata variable(s) describing the random effects part of the model.}
 
-\item{adjust_offset}{If TRUE (default), an offset term will be included as the logarithm of \code{scale_factor}.}
+\item{domain}{Domain used to choose the default size-factor normalization. Must be one of
+\code{"microbiome"}, \code{"single_cell"}, \code{"bulk_rnaseq"}, or \code{"custom"}.
+The default is \code{"microbiome"}.}
 
-\item{scale_factor}{Name of the numerical variable containing library size (for non-normalized data) or scale factor
-(for normalized data) across samples to be included as an offset in the base model (when \code{adjust_offset = TRUE}).
-If not found in metadata, defaults to the sample-wise total sums, unless \code{adjust_offset = FALSE}.}
+\item{normalization}{Size-factor strategy used only to compute the model offset. The input feature
+table is never normalized or transformed. If \code{NULL}, the domain default is used:
+\code{"TSS"} for microbiome/custom, \code{"SCRAN"} for single-cell, and \code{"TMM"}
+for bulk RNA-seq. Supported strategies are \code{"TSS"}, \code{"GMPR"}, \code{"CSS"},
+\code{"SCRAN"}, \code{"TMM"}, \code{"RLE"} / \code{"DESEQ2"}, \code{"CPM"},
+\code{"MEDIAN"}, and \code{"NONE"}.}
+
+\item{adjust_offset}{If TRUE (default), an offset term will be included as the logarithm of the
+size factor estimated by \code{normalization}, or by \code{scale_factor} when supplied.}
+
+\item{scale_factor}{Name of a numerical metadata variable containing user-supplied sample size
+factors. When supplied, this overrides \code{domain} and \code{normalization} for offset calculation.}
 
 \item{max_significance}{The q-value threshold for significance. Default is 0.05.}
 
@@ -143,7 +173,9 @@ Ignored for random effects modeling which uses an alternative Template Model Bui
 \item{reference}{The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).}
 }
 \value{
-A data frame containing coefficient estimates, p-values, and q-values (multiplicity-adjusted p-values) are returned.
+For single-omics input, a data frame containing coefficient estimates, p-values,
+and q-values (multiplicity-adjusted p-values) is returned. For \code{MultiAssayExperiment}
+input, a named list of omics-specific result data frames is returned.
 }
 \description{
 Fit a per-feature Tweedie generalized linear model to omics features.

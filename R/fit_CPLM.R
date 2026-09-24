@@ -268,6 +268,7 @@ fit.CPLM <- function(features,
   
   outputs <-
     pbapply::pblapply(seq_len(ncol(features)), cl = cluster, function(x) {
+      metadata_names <- setdiff(colnames(metadata), "offset")
       
       #################################
       # Create per-feature data frame #
@@ -320,9 +321,9 @@ fit.CPLM <- function(features,
       else{
         logging::logwarn(paste("Fitting problem for feature", x, "returning NA"))
         output$para <-
-          as.data.frame(matrix(NA,  nrow = ncol(metadata) - 1, ncol = 5)) # Everything except offset
+          as.data.frame(matrix(NA,  nrow = length(metadata_names), ncol = 5))
         output$para$name <-
-          colnames(metadata)[-ncol(metadata)] # Everything except offset
+          metadata_names
       }
       colnames(output$para) <-
         c('coef',

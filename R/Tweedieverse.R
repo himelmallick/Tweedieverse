@@ -4,9 +4,14 @@
 
 #' @param input_features A tab-delimited input file or an R data frame of features (can be in rows/columns)
 #' and samples (or cells). Samples are expected to have matching names with \code{input_metadata}. 
-#' \code{input_features} can also be an object of class \code{SummarizedExperiment} or \code{SingleCellExperiment} 
-#' that contains the expression or abundance matrix and other metadata; the \code{assays} 
-#' slot contains the expression or abundance matrix and is named \code{"counts"}.  
+#' \code{input_features} can also be a domain-appropriate Bioconductor container, such as
+#' \code{TreeSummarizedExperiment} for \code{domain = "microbiome"},
+#' \code{SingleCellExperiment} for \code{domain = "single_cell"}, and
+#' \code{SummarizedExperiment} for \code{domain = "bulk_rnaseq"}. The \code{assays} slot contains the expression
+#' or abundance matrix and defaults to an assay named \code{"counts"}.
+#' A \code{MultiAssayExperiment} object is also accepted. In that case,
+#' \code{Tweedieverse()} iterates over each experiment/omics layer and returns a named
+#' list of omics-specific results.
 #' This matrix should have one row for each feature and one sample for each column.  
 #' The \code{colData} slot should contain a data frame with one row per 
 #' sample and columns that contain metadata for each sample. 
@@ -14,12 +19,13 @@
 #' \code{metadata} slot as a list.
 #' @param input_metadata A tab-delimited input file or an R data frame of metadata (rows/columns).
 #' Samples are expected to have matching sample names with \code{input_features}. 
-#' This file is ignored when \code{input_features} is a \code{SummarizedExperiment} 
-#' or a \code{SingleCellExperiment} object with \code{colData} containing the same information.
+#' This file is ignored when \code{input_features} is a supported Bioconductor
+#' container with \code{colData} containing the same information.
 #' @param output The output folder to write results.
-#' @param assay_name If the input is provided as one of the accepted Bioconductor objects 
-#' (e.g., SummarizedExperiment, RangedSummarizedExperiment, SingleCellExperiment, or TreeSummarizedExperiment), 
+#' @param assay_name If the input is provided as one of the accepted Bioconductor objects,
 #' this argument selects the name of the assay slot in the input object that contains the omics measurements.
+#' For \code{MultiAssayExperiment} input, most arguments can be supplied as a single value
+#' used for every omics layer, or as a named list/vector keyed by experiment name.
 #' @param abd_threshold If prevalence-abundance filtering is desired, only features that are present (or detected)
 #' in at least \code{prev_threshold} percent of samples at \code{abd_threshold} minimum abundance (read count or proportion)
 #' are retained. Default value for \code{abd_threshold} is \code{0.0}.
@@ -41,12 +47,28 @@
 #' pin the model to that fixed index. Negative supplied powers are allowed with a warning for non-negative data,
 #' but negative feature values are supported only at \code{p = 0}.
 #' Random-effect models support fixed \code{p = 0}, \code{p = 1}, \code{1 < p < 2}, \code{p = 2}, and \code{p = 3}.
+#' @param p0_transform Transformation to apply to a copy of the filtered feature table when the
+#' resolved Tweedie index is \code{0}. The original input data are not modified. Must be one of
+#' \code{"NONE"}, \code{"CLR"}, \code{"RCLR"}, \code{"LOG"}, or \code{"ARC_SIGNED_SQRT"}.
+#' The transformed copy is used for the \code{p = 0} abundance model and written to
+#' \code{transformed_features.tsv} when \code{output} is provided. Default is \code{"NONE"}.
+#' @param p0_transform_pseudocount Numeric pseudocount used for \code{p0_transform = "CLR"} and
+#' \code{p0_transform = "LOG"}. Default is 1.
 #' @param fixed_effects Metadata variable(s) describing the fixed effects coefficients.
 #' @param random_effects Metadata variable(s) describing the random effects part of the model.
-#' @param adjust_offset If TRUE (default), an offset term will be included as the logarithm of \code{scale_factor}.
-#' @param scale_factor Name of the numerical variable containing library size (for non-normalized data) or scale factor
-#' (for normalized data) across samples to be included as an offset in the base model (when \code{adjust_offset = TRUE}).
-#' If not found in metadata, defaults to the sample-wise total sums, unless \code{adjust_offset = FALSE}.
+#' @param domain Domain used to choose the default size-factor normalization. Must be one of
+#' \code{"microbiome"}, \code{"single_cell"}, \code{"bulk_rnaseq"}, or \code{"custom"}.
+#' The default is \code{"microbiome"}.
+#' @param normalization Size-factor strategy used only to compute the model offset. The input feature
+#' table is never normalized or transformed. If \code{NULL}, the domain default is used:
+#' \code{"TSS"} for microbiome/custom, \code{"SCRAN"} for single-cell, and \code{"TMM"}
+#' for bulk RNA-seq. Supported strategies are \code{"TSS"}, \code{"GMPR"}, \code{"CSS"},
+#' \code{"SCRAN"}, \code{"TMM"}, \code{"RLE"} / \code{"DESEQ2"}, \code{"CPM"},
+#' \code{"MEDIAN"}, and \code{"NONE"}.
+#' @param adjust_offset If TRUE (default), an offset term will be included as the logarithm of the
+#' size factor estimated by \code{normalization}, or by \code{scale_factor} when supplied.
+#' @param scale_factor Name of a numerical metadata variable containing user-supplied sample size
+#' factors. When supplied, this overrides \code{domain} and \code{normalization} for offset calculation.
 #' @param max_significance The q-value threshold for significance. Default is 0.05.
 #' @param correction The correction method for computing the q-value (see \code{\link[stats]{p.adjust}} for options, default is 'BH').
 #' @param Maaslin2_run Logical. For \code{tweedie_p = 0}, run the MaAsLin2 linear-model path instead of the
@@ -81,7 +103,9 @@
 #' @importFrom SummarizedExperiment colData
 #' @importFrom dplyr %>% everything
 #' @importFrom parallel clusterExport
-#' @return A data frame containing coefficient estimates, p-values, and q-values (multiplicity-adjusted p-values) are returned.
+#' @return For single-omics input, a data frame containing coefficient estimates, p-values,
+#' and q-values (multiplicity-adjusted p-values) is returned. For \code{MultiAssayExperiment}
+#' input, a named list of omics-specific result data frames is returned.
 #'
 #' @author Himel Mallick, \email{him4004@@med.cornell.edu}
 #'
@@ -134,8 +158,12 @@ Tweedieverse <- function(input_features,
                          base_model = "CPLM",
                          link = "log",
                          tweedie_p = NULL,
+                         p0_transform = "NONE",
+                         p0_transform_pseudocount = 1,
                          fixed_effects = NULL,
                          random_effects = NULL,
+                         domain = "microbiome",
+                         normalization = NULL,
                          adjust_offset = TRUE,
                          scale_factor = NULL,
                          max_significance = 0.05,
@@ -154,6 +182,120 @@ Tweedieverse <- function(input_features,
                          plot_scatter = FALSE,
                          heatmap_first_n = 50,
                          reference = NULL) {
+  if (inherits(input_features, "MultiAssayExperiment")) {
+    return(run_multiassay_tweedieverse(
+      input_features = input_features,
+      input_metadata = input_metadata,
+      output = output,
+      assay_name = assay_name,
+      abd_threshold = abd_threshold,
+      prev_threshold = prev_threshold,
+      var_threshold = var_threshold,
+      entropy_threshold = entropy_threshold,
+      base_model = base_model,
+      link = link,
+      tweedie_p = tweedie_p,
+      p0_transform = p0_transform,
+      p0_transform_pseudocount = p0_transform_pseudocount,
+      fixed_effects = fixed_effects,
+      random_effects = random_effects,
+      domain = domain,
+      normalization = normalization,
+      adjust_offset = adjust_offset,
+      scale_factor = scale_factor,
+      max_significance = max_significance,
+      correction = correction,
+      Maaslin2_run = Maaslin2_run,
+      median_comparison = median_comparison,
+      median_subtraction = median_subtraction,
+      run_presence_absence_model = run_presence_absence_model,
+      method_args = method_args,
+      method.args = method.args,
+      standardize = standardize,
+      cores = cores,
+      optimizer = optimizer,
+      na.action = na.action,
+      plot_heatmap = plot_heatmap,
+      plot_scatter = plot_scatter,
+      heatmap_first_n = heatmap_first_n,
+      reference = reference
+    ))
+  }
+
+  .Tweedieverse_single(
+    input_features = input_features,
+    input_metadata = input_metadata,
+    output = output,
+    assay_name = assay_name,
+    abd_threshold = abd_threshold,
+    prev_threshold = prev_threshold,
+    var_threshold = var_threshold,
+    entropy_threshold = entropy_threshold,
+    base_model = base_model,
+    link = link,
+    tweedie_p = tweedie_p,
+    p0_transform = p0_transform,
+    p0_transform_pseudocount = p0_transform_pseudocount,
+    fixed_effects = fixed_effects,
+    random_effects = random_effects,
+    domain = domain,
+    normalization = normalization,
+    adjust_offset = adjust_offset,
+    scale_factor = scale_factor,
+    max_significance = max_significance,
+    correction = correction,
+    Maaslin2_run = Maaslin2_run,
+    median_comparison = median_comparison,
+    median_subtraction = median_subtraction,
+    run_presence_absence_model = run_presence_absence_model,
+    method_args = method_args,
+    method.args = method.args,
+    standardize = standardize,
+    cores = cores,
+    optimizer = optimizer,
+    na.action = na.action,
+    plot_heatmap = plot_heatmap,
+    plot_scatter = plot_scatter,
+    heatmap_first_n = heatmap_first_n,
+    reference = reference
+  )
+}
+
+.Tweedieverse_single <- function(input_features,
+                                 input_metadata = NULL,
+                                 output = NULL,
+                                 assay_name = "counts",
+                                 abd_threshold = 0.0,
+                                 prev_threshold = 0.1,
+                                 var_threshold = 0.0,
+                                 entropy_threshold = 0.0,
+                                 base_model = "CPLM",
+                                 link = "log",
+                                 tweedie_p = NULL,
+                                 p0_transform = "NONE",
+                                 p0_transform_pseudocount = 1,
+                                 fixed_effects = NULL,
+                                 random_effects = NULL,
+                                 domain = "microbiome",
+                                 normalization = NULL,
+                                 adjust_offset = TRUE,
+                                 scale_factor = NULL,
+                                 max_significance = 0.05,
+                                 correction = "BH",
+                                 Maaslin2_run = TRUE,
+                                 median_comparison = FALSE,
+                                 median_subtraction = FALSE,
+                                 run_presence_absence_model = FALSE,
+                                 method_args = NULL,
+                                 method.args = NULL,
+                                 standardize = TRUE,
+                                 cores = 1,
+                                 optimizer = "nlminb",
+                                 na.action = na.exclude,
+                                 plot_heatmap = FALSE,
+                                 plot_scatter = FALSE,
+                                 heatmap_first_n = 50,
+                                 reference = NULL) {
   
   
 
@@ -165,6 +307,8 @@ Tweedieverse <- function(input_features,
   
   model_choices <- c("CPLM")
   link_choices <- c("log", "identity", "sqrt", "inverse")
+  p0_transform_choices <- c("NONE", "CLR", "RCLR", "LOG", "ARC_SIGNED_SQRT")
+  domain_choices <- c("microbiome", "single_cell", "bulk_rnaseq", "custom")
   correction_choices <-
     c("BH", "holm", "hochberg", "hommel", "bonferroni", "BY")
   optimizer_choices <- c("nlminb", "bobyqa", "L-BFGS-B")
@@ -178,9 +322,16 @@ Tweedieverse <- function(input_features,
   #########################################
   # Support multiple Bioconductor classes #
   #########################################
-  
-  valid_classes <- c("SummarizedExperiment", "RangedSummarizedExperiment", 
-                     "SingleCellExperiment", "TreeSummarizedExperiment")
+
+  domain <- tolower(domain)
+  if (!domain %in% domain_choices) {
+    option_not_valid_error(
+      "Please select a domain from the list of available options",
+      toString(domain_choices)
+    )
+  }
+
+  valid_classes <- unique(unlist(domain_bioc_container_map()))
   
   ##############################################################
   # Extract features and metadata based on user-provided input #
@@ -188,6 +339,7 @@ Tweedieverse <- function(input_features,
   
   is_supported_bioc_class <- inherits(input_features, valid_classes)
   if (is_supported_bioc_class) {
+    validate_domain_bioc_container(input_features, domain)
     data <- extractAssay(input_features, assay_name)
     if (is.null(input_metadata)) {
       metadata <- data.frame(SummarizedExperiment::colData(input_features))
@@ -199,8 +351,8 @@ Tweedieverse <- function(input_features,
       sprintf(
         paste(
           "Input data of class <%s> not supported.",
-          "Please use SummarizedExperiment, SingleCellExperiment,",
-          "RangedSummarizedExperiment, TreeSummarizedExperiment, or data.frame."
+          "Please use a domain-appropriate Bioconductor container,",
+          "a data.frame, or a tab-delimited file path."
         ),
         class(input_features)[1]
       )
@@ -289,8 +441,12 @@ Tweedieverse <- function(input_features,
   logging::logdebug("Base model: %s", base_model)
   logging::logdebug("Link function: %s", link)
   logging::logdebug("Tweedie variance power: %s", ifelse(is.null(tweedie_p), "NULL", tweedie_p))
+  logging::logdebug("p = 0 transform: %s", p0_transform)
+  logging::logdebug("p = 0 transform pseudocount: %f", p0_transform_pseudocount)
   logging::logdebug("Fixed effects: %s", fixed_effects)
   logging::logdebug("Random effects: %s", random_effects)
+  logging::logdebug("Domain: %s", domain)
+  logging::logdebug("Normalization: %s", ifelse(is.null(normalization), "NULL", normalization))
   logging::logdebug("Offset adjustment: %s", adjust_offset)
   logging::logdebug("Scale factor: %s", scale_factor)
   logging::logdebug("Max significance: %f", max_significance)
@@ -324,6 +480,29 @@ Tweedieverse <- function(input_features,
       toString(model_choices)
     )
   }
+
+  p0_transform <- gsub("[ -]", "_", toupper(p0_transform))
+  if (p0_transform %in% c("ARCSIGNEDSQRT", "ARC_SIGNED_SQUARE_ROOT", "SIGNED_SQRT")) {
+    p0_transform <- "ARC_SIGNED_SQRT"
+  }
+  if (!p0_transform %in% p0_transform_choices) {
+    option_not_valid_error(
+      "Please select a p0_transform from the list of available options",
+      toString(p0_transform_choices)
+    )
+  }
+  if (length(p0_transform_pseudocount) != 1L ||
+      !is.numeric(p0_transform_pseudocount) ||
+      !is.finite(p0_transform_pseudocount) ||
+      p0_transform_pseudocount < 0) {
+    stop("p0_transform_pseudocount must be a single non-negative finite numeric value.")
+  }
+
+  normalization <- resolve_tweedieverse_normalization(
+    domain = domain,
+    normalization = normalization,
+    scale_factor = scale_factor
+  )
   
   # Check if the selected correction is valid
   if (!correction %in% correction_choices) {
@@ -378,6 +557,12 @@ Tweedieverse <- function(input_features,
     stop("Maaslin2_run must be TRUE or FALSE.")
   }
 
+  if (!is.logical(adjust_offset) ||
+      length(adjust_offset) != 1L ||
+      is.na(adjust_offset)) {
+    stop("adjust_offset must be TRUE or FALSE.")
+  }
+
   if (!is.null(method_args) && !is.null(method.args)) {
     stop("Please provide only one of method_args or method.args.")
   }
@@ -422,7 +607,7 @@ Tweedieverse <- function(input_features,
         "as columns and metadata samples as rows"
       ))
       # transpose data frame so samples are rows
-      data <- utils::type.convert(as.data.frame(t(data)))
+      data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
       logging::logdebug("linked data so samples are rows")
     } else {
       samples_column_column <-
@@ -434,8 +619,8 @@ Tweedieverse <- function(input_features,
             "as columns and metadata samples as columns"
           )
         )
-        data <- utils::type.convert(as.data.frame(t(data)))
-        metadata <- utils::type.convert(as.data.frame(t(metadata)))
+        data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
+        metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
         logging::logdebug("linked data and metadata so samples are rows")
       } else {
         samples_row_column <-
@@ -447,7 +632,7 @@ Tweedieverse <- function(input_features,
               "as rows and metadata samples as columns"
             )
           )
-          metadata <- utils::type.convert(as.data.frame(t(metadata)))
+          metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
           logging::logdebug("linked metadata so samples are rows")
         } else {
           logging::logerror(
@@ -672,26 +857,26 @@ Tweedieverse <- function(input_features,
   }
   
   
-  ########################################################################
-  # Set the scale factor to rowsum if not provided and create a modified #
-  # metadata table without the scale factor variable (if present) ########
-  ########################################################################
-  
-  if (is.null(scale_factor)) {
-    offset <- rowSums(final_features)
+  #############################################################
+  # Compute size factors for the model offset without touching #
+  # the feature table used as the response. ###################
+  #############################################################
+
+  offset <- NULL
+  if (adjust_offset) {
+    offset <- compute_tweedieverse_size_factor(
+      features = unfiltered_data,
+      metadata = unfiltered_metadata,
+      normalization = normalization,
+      scale_factor = scale_factor
+    )
+    logging::loginfo("Offset size factors computed with normalization: %s", normalization)
   } else {
-    if (!scale_factor %in% colnames(unfiltered_metadata)) {
-      stop(
-        paste(
-          "The specified scale_factor variable is not present in the metadata table:\n",
-          scale_factor
-        )
-      )
-    } else {
-      offset <- unfiltered_metadata[, scale_factor]
-      unfiltered_metadata <-
-        dplyr::select(unfiltered_metadata,-scale_factor)
-    }
+    logging::loginfo("Offset adjustment disabled; feature data remain on the input scale.")
+  }
+
+  if (!is.null(scale_factor) && scale_factor %in% colnames(unfiltered_metadata)) {
+    unfiltered_metadata <- dplyr::select(unfiltered_metadata, -scale_factor)
   }
   
   
@@ -826,7 +1011,37 @@ Tweedieverse <- function(input_features,
   # Merge metadata and offset back #
   ##################################
   
-  final_metadata <- as.data.frame(cbind.data.frame(filtered_metadata, offset))
+  final_metadata <- as.data.frame(filtered_metadata)
+  if (adjust_offset) {
+    final_metadata$offset <- offset
+  }
+
+  analysis_features <- final_features
+  transformed_features <- NULL
+  if (!is.null(tweedie_p) && tweedie_p == 0) {
+    analysis_features <- p0_transform_features(
+      features = final_features,
+      transform = p0_transform,
+      pseudocount = p0_transform_pseudocount
+    )
+    if (p0_transform != "NONE") {
+      transformed_features <- analysis_features
+      logging::loginfo("Using p = 0 transformed feature copy with transform: %s", p0_transform)
+      if (!no_output) {
+        transformed_features_file <- file.path(output, "transformed_features.tsv")
+        logging::loginfo("Writing p = 0 transformed feature copy to file: %s", transformed_features_file)
+        write.table(
+          transformed_features,
+          file = transformed_features_file,
+          sep = "\t",
+          quote = FALSE,
+          row.names = TRUE
+        )
+      }
+    }
+  } else if (p0_transform != "NONE") {
+    message("p0_transform is only applied when the resolved tweedie_p is 0; ignoring p0_transform.")
+  }
   
   ##############################################################
   # Apply the base model to the filtered data with user inputs #
@@ -835,7 +1050,7 @@ Tweedieverse <- function(input_features,
   logging::loginfo("Running selected analysis method: %s", base_model)
   
   fit_data <- fit.Tweedieverse(
-    features = final_features,
+    features = analysis_features,
     metadata = final_metadata,
     base_model = base_model,
     link = link,

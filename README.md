@@ -6,6 +6,7 @@ Himel Mallick, Ali Rahnavard
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [What Tweedieverse Fits](#what-tweedieverse-fits)
+- [Domain-Specific Normalization and Offsets](#domain-specific-normalization-and-offsets)
 - [Tweedie Variance Power](#tweedie-variance-power)
 - [MaAsLin2 Linear Model Option](#maaslin2-linear-model-option)
 - [Median Comparison](#median-comparison)
@@ -53,6 +54,70 @@ The main function is `Tweedieverse()`. At a high level, it:
 
 The default base model is `CPLM`, using compound Poisson Tweedie modeling for abundance-style outcomes. The default `tweedie_p = NULL` lets the model estimate the Tweedie index in the usual compound Poisson range between 1 and 2 when all filtered feature values are non-negative.
 
+Domain-Specific Normalization and Offsets
+-----------------------------------------
+
+Tweedieverse normalization is **offset-only**. The input feature table is not normalized, divided, log-transformed, or otherwise replaced by the normalization step. Instead, `domain` and `normalization` are used to estimate a sample-level size factor, and that size factor enters the model as:
+
+```r
+offset(log(size_factor))
+```
+
+The response remains on the original input scale:
+
+```r
+raw_feature_value ~ metadata + offset(log(size_factor))
+```
+
+Domain defaults and supported strategies are:
+
+| Domain | Default | Supported normalization strategies |
+| --- | --- | --- |
+| `microbiome` | `TSS` | `TSS`, `GMPR`, `CSS`, `MEDIAN`, `NONE` |
+| `single_cell` | `SCRAN` | `SCRAN`, `MEDIAN`, `NONE` |
+| `bulk_rnaseq` | `TMM` | `TMM`, `RLE` / `DESEQ2`, `CPM`, `MEDIAN`, `NONE` |
+| `custom` | `TSS` | all supported strategies |
+
+Examples:
+
+```r
+# Microbiome default: TSS-derived size factors as model offsets.
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  domain = "microbiome",
+  fixed_effects = "diagnosis"
+)
+
+# Microbiome GMPR size factors. The feature table is still untouched.
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  domain = "microbiome",
+  normalization = "GMPR",
+  fixed_effects = "diagnosis"
+)
+
+# Bulk RNA-seq median-ratio size factors.
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  domain = "bulk_rnaseq",
+  normalization = "RLE",
+  fixed_effects = "condition"
+)
+
+# Use a user-supplied metadata column as the size factor.
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  scale_factor = "library_size",
+  fixed_effects = "group"
+)
+```
+
+`scale_factor` always overrides `domain` and `normalization`. Set `adjust_offset = FALSE` to fit without a model offset.
+
 Tweedie Variance Power
 ----------------------
 
@@ -75,6 +140,32 @@ Values between 0 and 1 are undefined and are rejected. Negative supplied Tweedie
 When the resolved index is `p = 0`, Tweedieverse automatically uses `link = "identity"` and disables the log-offset because log, sqrt, and inverse links are not appropriate for responses that can span the negative half line.
 
 For random-effects models, fixed powers are supported at `p = 0`, `p = 1`, `1 < p < 2`, `p = 2`, and `p = 3`. Fixed random-effect powers inside `(1, 2)` are pinned in `glmmTMB`; boundary values use the corresponding Gaussian, Poisson, Gamma, or inverse Gaussian family.
+
+For `p = 0`, Tweedieverse can optionally transform a **copy** of the filtered feature table for the Gaussian abundance model:
+
+```r
+fit <- Tweedieverse(
+  input_features = features,
+  input_metadata = metadata,
+  output = "demo_output/p0_log",
+  fixed_effects = "diagnosis",
+  tweedie_p = 0,
+  p0_transform = "LOG",
+  p0_transform_pseudocount = 1
+)
+```
+
+Supported `p0_transform` values are:
+
+| `p0_transform` | Behavior |
+| --- | --- |
+| `NONE` | Use the filtered feature table as-is |
+| `CLR` | Centered log-ratio transform with `p0_transform_pseudocount` |
+| `RCLR` | Robust CLR using positive values only; zeros remain zero |
+| `LOG` | `log(x + p0_transform_pseudocount)` |
+| `ARC_SIGNED_SQRT` | `sign(x) * sqrt(abs(x))` |
+
+The original input object is not modified. When `output` is provided and a non-`NONE` transform is used, the analysis copy is written to `transformed_features.tsv`.
 
 MaAsLin2 Linear Model Option
 ----------------------------
@@ -259,17 +350,59 @@ The feature table should contain samples and omics features such as taxa, genes,
 
 - a data frame,
 - a tab-delimited file path,
-- a `SummarizedExperiment`,
-- a `SingleCellExperiment`,
-- a `RangedSummarizedExperiment`,
-- a `TreeSummarizedExperiment`.
+- a domain-appropriate Bioconductor container,
+- a `MultiAssayExperiment` containing multiple omics layers.
+
+The domain-specific Bioconductor container expectations are:
+
+| Domain | Preferred container |
+| --- | --- |
+| `microbiome` | `TreeSummarizedExperiment` |
+| `single_cell` | `SingleCellExperiment` |
+| `bulk_rnaseq` | `SummarizedExperiment` |
+| `custom` | any supported SummarizedExperiment-like container |
 
 When a Bioconductor object is supplied, `assay_name` selects the assay to use, and `colData` is used as metadata unless `input_metadata` is provided separately.
+
+### Multi-omics input with `MultiAssayExperiment`
+
+When `input_features` is a `MultiAssayExperiment`, Tweedieverse iterates over each experiment/omics layer and returns a named list of omics-specific result tables. If `output` is provided, each omics layer is written to its own subdirectory.
+
+Most Tweedieverse arguments can be supplied either as a single value used for every omics layer or as a named list/vector keyed by experiment name. Use a named list when one layer needs `NULL`, because atomic vectors cannot reliably store per-layer `NULL` values.
+
+```r
+fit <- Tweedieverse(
+  input_features = mae,
+  output = "tweedieverse_multiomics",
+  fixed_effects = "group",
+  domain = c(
+    microbiome = "microbiome",
+    rnaseq = "bulk_rnaseq"
+  ),
+  normalization = c(
+    microbiome = "TSS",
+    rnaseq = "TMM"
+  ),
+  tweedie_p = list(
+    microbiome = NULL,
+    rnaseq = 1.5
+  ),
+  run_presence_absence_model = c(
+    microbiome = TRUE,
+    rnaseq = FALSE
+  ),
+  cores = 1
+)
+
+names(fit)
+fit$microbiome
+fit$rnaseq
+```
 
 Output
 ------
 
-`Tweedieverse()` returns a data frame ordered by increasing q-value. The main columns are:
+For single-omics input, `Tweedieverse()` returns a data frame ordered by increasing q-value. For `MultiAssayExperiment` input, it returns a named list of omics-specific data frames, each with an `omics` column. The main columns are:
 
 - `feature`: the tested feature,
 - `metadata`: the metadata variable,

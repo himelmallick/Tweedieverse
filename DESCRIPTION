@@ -9,7 +9,7 @@ Authors@R: c(
 Description: A toolkit for differential analysis of omics data. Implements a CPLM-based statistical workflow built on the Tweedie distribution. Unlike traditional single-omics tools, Tweedieverse is technology-agnostic and can be applied to both count and continuous measurements arising from diverse high-throughput technologies (e.g. transcript abundances from bulk and single-cell RNA-Seq studies in the form of UMI counts or non-UMI counts, microbiome taxonomic and functional profiles in the form of counts or relative abundances, and compound abundance levels or peak intensities from metabolomics and other mass spectrometry-based experiments, among others). The software includes multiple customization options such as the inclusion of random effects and multiple covariates along with several data exploration capabilities and visualization modules in a unified estimation umbrella.
 Depends: R (>= 4.5.0)
 Imports: cplm, glmmTMB, pbapply, logging, parallel, dplyr, ggplot2, pheatmap, cowplot, SummarizedExperiment, statmod, Maaslin2
-Suggests: data.table, knitr, testthat
+Suggests: data.table, knitr, testthat, edgeR, scran, SingleCellExperiment, TreeSummarizedExperiment, MultiAssayExperiment
 License: MIT + file LICENSE
 Encoding: UTF-8
 RoxygenNote: 7.3.3
