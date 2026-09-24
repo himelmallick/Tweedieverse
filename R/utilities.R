@@ -492,7 +492,7 @@ resolve_tweedieverse_normalization <- function(domain,
     microbiome = "TSS",
     single_cell = "SCRAN",
     bulk_rnaseq = "TMM",
-    custom = "TSS"
+    custom = "MEDIAN"
   )
 
   if (is.null(normalization)) {

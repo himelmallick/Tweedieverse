@@ -46,6 +46,7 @@ test_that("domain defaults and normalization choices resolve as expected", {
   expect_equal(resolve_tweedieverse_normalization("microbiome", NULL), "TSS")
   expect_equal(resolve_tweedieverse_normalization("single_cell", NULL), "SCRAN")
   expect_equal(resolve_tweedieverse_normalization("bulk_rnaseq", NULL), "TMM")
+  expect_equal(resolve_tweedieverse_normalization("custom", NULL), "MEDIAN")
   expect_equal(resolve_tweedieverse_normalization("bulk_rnaseq", "DESEQ2"), "RLE")
   expect_error(
     resolve_tweedieverse_normalization("single_cell", "TMM"),

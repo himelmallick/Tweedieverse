@@ -58,8 +58,9 @@
 #' The default is \code{"microbiome"}.
 #' @param normalization Size-factor strategy used only to compute the model offset. The input feature
 #' table is never normalized or transformed. If \code{NULL}, the domain default is used:
-#' \code{"TSS"} for microbiome/custom, \code{"SCRAN"} for single-cell, and \code{"TMM"}
-#' for bulk RNA-seq. Supported strategies are \code{"TSS"}, \code{"GMPR"}, \code{"CSS"},
+#' \code{"TSS"} for microbiome, \code{"SCRAN"} for single-cell, \code{"TMM"}
+#' for bulk RNA-seq, and \code{"MEDIAN"} for custom/other omics.
+#' Supported strategies are \code{"TSS"}, \code{"GMPR"}, \code{"CSS"},
 #' \code{"SCRAN"}, \code{"TMM"}, \code{"RLE"} / \code{"DESEQ2"}, \code{"CPM"},
 #' \code{"MEDIAN"}, and \code{"NONE"}.
 #' @param adjust_offset If TRUE (default), an offset term will be included as the logarithm of the

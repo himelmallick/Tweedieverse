@@ -76,7 +76,7 @@ Domain defaults and supported strategies are:
 | `microbiome` | `TSS` | `TSS`, `GMPR`, `CSS`, `MEDIAN`, `NONE` |
 | `single_cell` | `SCRAN` | `SCRAN`, `MEDIAN`, `NONE` |
 | `bulk_rnaseq` | `TMM` | `TMM`, `RLE` / `DESEQ2`, `CPM`, `MEDIAN`, `NONE` |
-| `custom` | `TSS` | all supported strategies |
+| `custom` / other omics | `MEDIAN` | all supported strategies |
 
 Examples:
 
