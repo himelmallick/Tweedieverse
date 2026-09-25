@@ -188,6 +188,24 @@ extract_method_args <- function(method_args, method) {
   list()
 }
 
+parse_effect_names <- function(effects) {
+  if (is.null(effects)) {
+    return(NULL)
+  }
+
+  effects <- as.character(effects)
+  if (any(grepl(",", effects, fixed = TRUE))) {
+    stop(
+      paste(
+        "fixed_effects and random_effects must be character vectors.",
+        "Use c(\"diagnosis\", \"antibiotics\") instead of \"diagnosis,antibiotics\"."
+      )
+    )
+  }
+  effects <- trimws(effects)
+  effects[nzchar(effects)]
+}
+
 p0_transform_features <- function(features,
                                   transform = "NONE",
                                   pseudocount = 1) {

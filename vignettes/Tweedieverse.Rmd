@@ -1,0 +1,271 @@
+---
+title: "Tweedieverse"
+author: "Himel Mallick, Ali Rahnavard"
+date: "`r BiocStyle::doc_date()`"
+package: "`r if (requireNamespace('Tweedieverse', quietly = TRUE)) BiocStyle::pkg_ver('Tweedieverse') else 'Tweedieverse development version'`"
+output:
+  BiocStyle::html_document:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{Tweedieverse}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Overview
+
+This vignette shows compact, package-contained examples for three common
+Tweedieverse workflow families:
+
+- microbiome relative abundances,
+- single-cell RNA-seq UMI counts,
+- single-cell RNA-seq non-UMI/read counts.
+
+The packaged files are small tab-delimited example excerpts stored in
+`inst/extdata` so that the vignette can be built without internet access. They
+are intended to exercise realistic input shapes, not to reproduce a full
+biological analysis.
+
+This vignette does **not** include simulation examples.
+
+```{r packages}
+suppressPackageStartupMessages({
+  library(Tweedieverse)
+  library(SummarizedExperiment)
+  library(SingleCellExperiment)
+  library(TreeSummarizedExperiment)
+})
+```
+
+## Loading Packaged Example Data
+
+Bioconductor package vignettes should run without downloading external files.
+The helper below finds the packaged `inst/extdata` files both when the package
+is installed and when the vignette is built from the source tree.
+
+```{r data-helpers}
+extdata_file <- function(file) {
+  candidates <- c(
+    system.file("extdata", file, package = "Tweedieverse"),
+    file.path("inst", "extdata", file),
+    file.path("..", "inst", "extdata", file)
+  )
+  candidates <- candidates[nzchar(candidates) & file.exists(candidates)]
+  if (length(candidates) == 0L) {
+    stop("Could not find packaged extdata file: ", file)
+  }
+  candidates[[1]]
+}
+
+read_feature_table <- function(file) {
+  tab <- utils::read.delim(
+    extdata_file(file),
+    row.names = 1,
+    check.names = FALSE
+  )
+  as.matrix(tab)
+}
+
+read_metadata_table <- function(file) {
+  utils::read.delim(
+    extdata_file(file),
+    row.names = 1,
+    check.names = FALSE
+  )
+}
+
+align_feature_metadata <- function(features, metadata) {
+  shared <- intersect(colnames(features), rownames(metadata))
+  if (length(shared) == 0L) {
+    stop("No overlapping sample/cell IDs between feature columns and metadata rows.")
+  }
+  list(
+    features = features[, shared, drop = FALSE],
+    metadata = metadata[shared, , drop = FALSE]
+  )
+}
+```
+
+## Microbiome Relative Abundance Example
+
+For microbiome data, `Tweedieverse()` accepts a
+`TreeSummarizedExperiment`. The assay contains taxa/features in rows and
+samples in columns; `colData` contains sample metadata.
+
+```{r microbiome-container}
+microbiome_features <- read_feature_table(
+  "tweedieverse_microbiome_relative_abundance.tsv"
+)
+microbiome_metadata <- read_metadata_table(
+  "tweedieverse_microbiome_metadata.tsv"
+)
+
+microbiome_aligned <- align_feature_metadata(
+  microbiome_features,
+  microbiome_metadata
+)
+
+microbiome_tse <- TreeSummarizedExperiment::TreeSummarizedExperiment(
+  assays = list(counts = microbiome_aligned$features),
+  colData = microbiome_aligned$metadata
+)
+
+microbiome_tse
+```
+
+The example table contains relative abundances, so this analysis disables
+additional offset normalization by setting `normalization = "NONE"`. For raw
+microbiome counts, omit that argument to use the microbiome default `TSS`
+size-factor offset.
+
+```{r microbiome-fit}
+microbiome_fit <- Tweedieverse(
+  input_features = microbiome_tse,
+  output = NULL,
+  assay_name = "counts",
+  domain = "microbiome",
+  normalization = "NONE",
+  fixed_effects = c("diagnosis", "antibiotics"),
+  tweedie_p = NULL,
+  median_comparison = FALSE,
+  cores = 1
+)
+
+head(microbiome_fit)
+```
+
+## Single-Cell RNA-seq UMI Count Example
+
+For single-cell RNA-seq data, `Tweedieverse()` accepts a
+`SingleCellExperiment`. The UMI example uses integer molecule counts.
+
+```{r umi-container}
+umi_features <- read_feature_table("tweedieverse_scrna_umi_counts.tsv")
+umi_metadata <- read_metadata_table("tweedieverse_scrna_umi_metadata.tsv")
+
+umi_aligned <- align_feature_metadata(umi_features, umi_metadata)
+
+umi_sce <- SingleCellExperiment::SingleCellExperiment(
+  assays = list(counts = umi_aligned$features),
+  colData = umi_aligned$metadata
+)
+
+umi_sce
+```
+
+UMI counts are count-like. Here we pin the variance power to `p = 1`, the
+Poisson variance case, and use the single-cell domain. `normalization = "SCRAN"`
+computes size factors for the model offset without modifying the assay.
+
+```{r umi-fit}
+umi_fit <- Tweedieverse(
+  input_features = umi_sce,
+  output = NULL,
+  assay_name = "counts",
+  domain = "single_cell",
+  normalization = "SCRAN",
+  fixed_effects = c("condition", "batch"),
+  tweedie_p = 1,
+  median_comparison = FALSE,
+  cores = 1
+)
+
+head(umi_fit)
+```
+
+## Single-Cell RNA-seq Non-UMI / Read Count Example
+
+The non-UMI example uses read-count-like measurements. These can have a more
+flexible mean-variance relationship than UMI counts, so we leave
+`tweedie_p = NULL` and let Tweedieverse estimate the index after filtering.
+
+```{r nonumi-container}
+nonumi_features <- read_feature_table("tweedieverse_scrna_nonumi_counts.tsv")
+nonumi_metadata <- read_metadata_table("tweedieverse_scrna_nonumi_metadata.tsv")
+
+nonumi_aligned <- align_feature_metadata(nonumi_features, nonumi_metadata)
+
+nonumi_sce <- SingleCellExperiment::SingleCellExperiment(
+  assays = list(counts = nonumi_aligned$features),
+  colData = nonumi_aligned$metadata
+)
+
+nonumi_sce
+```
+
+```{r nonumi-fit}
+nonumi_fit <- Tweedieverse(
+  input_features = nonumi_sce,
+  output = NULL,
+  assay_name = "counts",
+  domain = "single_cell",
+  normalization = "SCRAN",
+  fixed_effects = c("condition", "batch"),
+  tweedie_p = NULL,
+  median_comparison = FALSE,
+  cores = 1
+)
+
+head(nonumi_fit)
+```
+
+## Multi-omics Container
+
+The same containers can be collected into a `MultiAssayExperiment`. Each omics
+layer is analyzed independently, and per-omics parameters can be supplied as
+named vectors or lists.
+
+```{r multiassay}
+suppressPackageStartupMessages(library(MultiAssayExperiment))
+
+tweedieverse_mae <- MultiAssayExperiment::MultiAssayExperiment(
+  experiments = list(
+    microbiome = microbiome_tse,
+    scrna_umi = umi_sce,
+    scrna_nonumi = nonumi_sce
+  )
+)
+
+multi_fit <- Tweedieverse(
+  input_features = tweedieverse_mae,
+  output = NULL,
+  domain = c(
+    microbiome = "microbiome",
+    scrna_umi = "single_cell",
+    scrna_nonumi = "single_cell"
+  ),
+  normalization = c(
+    microbiome = "NONE",
+    scrna_umi = "SCRAN",
+    scrna_nonumi = "SCRAN"
+  ),
+  fixed_effects = list(
+    microbiome = c("diagnosis", "antibiotics"),
+    scrna_umi = c("condition", "batch"),
+    scrna_nonumi = c("condition", "batch")
+  ),
+  tweedie_p = list(
+    microbiome = NULL,
+    scrna_umi = 1,
+    scrna_nonumi = NULL
+  ),
+  median_comparison = FALSE,
+  cores = 1
+)
+
+names(multi_fit)
+head(multi_fit$microbiome)
+head(multi_fit$scrna_umi)
+head(multi_fit$scrna_nonumi)
+```
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```

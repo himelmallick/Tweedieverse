@@ -143,8 +143,8 @@
 #' )
 #' }
 #' 
-#' # For a full iHMP workflow example, see:
-#' # vignette("Tweedieverse-vignette", package = "Tweedieverse")
+#' # For Bioconductor-container workflow examples, see:
+#' # vignette("Tweedieverse", package = "Tweedieverse")
 #' @keywords microbiome metagenomics multiomics scRNASeq tweedie singlecell
 #' @export
 Tweedieverse <- function(input_features,
@@ -698,7 +698,9 @@ Tweedieverse <- function(input_features,
   logging::logdebug("Reordering data/metadata to use same sample ordering")
   data <- data[intersect_samples, , drop = FALSE]
   metadata <- metadata[intersect_samples, , drop = FALSE]
-  
+
+  fixed_effects <- parse_effect_names(fixed_effects)
+  random_effects <- parse_effect_names(random_effects)
 
   ########################################################################
   # Assign reference values to categorical metadata (fixed effects only) #
@@ -912,7 +914,6 @@ Tweedieverse <- function(input_features,
   if (is.null(fixed_effects)) {
     fixed_effects <- colnames(filtered_metadata)
   } else {
-    fixed_effects <- unlist(strsplit(fixed_effects, ",", fixed = TRUE))
     # remove any fixed effects not found in metadata names
     to_remove <- setdiff(fixed_effects, colnames(filtered_metadata))
     if (length(to_remove) > 0)
@@ -931,8 +932,6 @@ Tweedieverse <- function(input_features,
   }
   
   if (!is.null(random_effects)) {
-    random_effects <-
-      unlist(strsplit(random_effects, ",", fixed = TRUE))
     # subtract random effects from fixed effects
     fixed_effects <- setdiff(fixed_effects, random_effects)
     # remove any random effects not found in metadata

@@ -214,8 +214,8 @@ maaslin2_median_fit <- Tweedieverse(
 )
 }
 
-# For a full iHMP workflow example, see:
-# vignette("Tweedieverse-vignette", package = "Tweedieverse")
+# For Bioconductor-container workflow examples, see:
+# vignette("Tweedieverse", package = "Tweedieverse")
 }
 \author{
 Himel Mallick, \email{him4004@med.cornell.edu}

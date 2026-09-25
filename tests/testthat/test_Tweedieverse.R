@@ -205,6 +205,46 @@ test_that("Tweedieverse keeps input data unchanged when normalization is selecte
   expect_true(nrow(fit) > 0)
 })
 
+test_that("vector fixed effects are parsed before metadata validation", {
+  set.seed(123)
+  features <- as.data.frame(matrix(rpois(80, lambda = 5), nrow = 20, ncol = 4))
+  colnames(features) <- paste0("feature", seq_len(ncol(features)))
+  rownames(features) <- paste0("sample", seq_len(nrow(features)))
+  metadata <- data.frame(
+    group = rep(c("A", "B"), each = 10),
+    antibiotic = rep(c("no", "yes"), times = 10),
+    row.names = rownames(features)
+  )
+
+  fit <- Tweedieverse(
+    input_features = make_test_se(features, metadata),
+    output = NULL,
+    fixed_effects = c("group", "antibiotic"),
+    normalization = "NONE",
+    tweedie_p = 1,
+    median_comparison = FALSE,
+    max_significance = 1,
+    cores = 1
+  )
+
+  expect_true(nrow(fit) > 0)
+  expect_true(all(c("group", "antibiotic") %in% unique(fit$metadata)))
+})
+
+test_that("comma-separated fixed effects are rejected", {
+  expect_error(
+    parse_effect_names("group,antibiotic"),
+    "character vectors"
+  )
+})
+
+test_that("vector fixed effects are preserved", {
+  expect_equal(
+    parse_effect_names(c("group", "antibiotic")),
+    c("group", "antibiotic")
+  )
+})
+
 test_that("p equals 0 transformations return a copy and keep input data unchanged", {
   features <- data.frame(
     feature1 = c(1, 4, 9),

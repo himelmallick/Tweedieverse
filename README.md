@@ -423,7 +423,11 @@ When `run_presence_absence_model = TRUE`, additional abundance-specific and pres
 Getting Started with Tweedieverse
 ---------------------------------
 
-Check out the [Tweedie Labs](https://github.com/himelmallick/TweedieLabs/) repository for walkthrough tutorials on applying Tweedieverse to different omics data types.
+See the package vignette for Bioconductor-container examples covering microbiome relative abundances, single-cell RNA-seq UMI counts, single-cell RNA-seq non-UMI/read counts, and `MultiAssayExperiment` input:
+
+```r
+vignette("Tweedieverse", package = "Tweedieverse")
+```
 
 For full function options, see:
 
