@@ -43,14 +43,24 @@ This vignette demonstrates four Bioconductor-oriented workflows:
 
 ## Bioconductor Motivation
 
-Submitting `Tweedieverse` to Bioconductor makes the package easier to install,
-test, document, and reuse with established genomics infrastructure. The
-Bioconductor submission model also encourages reproducible examples, formal
-container classes, clear dependency management, and package checks across
-operating systems. For users, this means that analyses can start from familiar
-objects such as `SummarizedExperiment`, `SingleCellExperiment`,
-`TreeSummarizedExperiment`, and `MultiAssayExperiment`, rather than from
-unstructured tables whose orientation and metadata linkage must be inferred.
+Modern omics studies increasingly combine assays with different measurement
+scales, sparsity patterns, and mean-variance relationships. Microbiome
+profiles, single-cell RNA-seq measurements, bulk transcriptomic summaries, and
+metabolomics intensities can all contain many low-abundance or zero-valued
+features while still differing in the variance model most appropriate for
+differential analysis. `Tweedieverse` is designed for this setting by using the
+Tweedie variance function as a common modeling framework while preserving
+domain-specific choices such as normalization-derived offsets.
+
+Bioconductor containers provide a scientifically reproducible representation of
+these data. Assays, sample-level covariates, feature identifiers, and
+experiment metadata remain linked inside formal objects such as
+`SummarizedExperiment`, `SingleCellExperiment`, `TreeSummarizedExperiment`,
+and `MultiAssayExperiment`. This reduces ambiguity about sample orientation,
+metadata matching, and multi-omics alignment, which are common sources of
+analysis error in table-based workflows. It also allows `Tweedieverse` results
+to fit naturally into existing Bioconductor workflows for preprocessing,
+quality control, visualization, and downstream biological interpretation.
 
 ## Installation
 

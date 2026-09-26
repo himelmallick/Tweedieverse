@@ -96,9 +96,10 @@
 #' @param reference The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).
 #'
 #' @importFrom grDevices colorRampPalette dev.off jpeg pdf
-#' @importFrom stats coef fitted as.formula na.exclude p.adjust plogis relevel sd update
+#' @importFrom stats coef fitted as.formula na.exclude offset p.adjust plogis relevel sd update
 #' @importFrom utils capture.output read.table type.convert write.table
 #' @importFrom SummarizedExperiment colData
+#' @importClassesFrom TreeSummarizedExperiment TreeSummarizedExperiment
 #' @importFrom dplyr %>% everything
 #' @importFrom parallel clusterExport
 #' @return For single-omics input, a data frame containing coefficient estimates, p-values,
@@ -130,7 +131,6 @@
 #' )
 #' head(fit)
 #' 
-#' \dontrun{
 #' maaslin2_median_fit <- Tweedieverse(
 #'   input_features = experiment,
 #'   output = NULL,
@@ -141,7 +141,6 @@
 #'   median_subtraction = TRUE,
 #'   cores = 1
 #' )
-#' }
 #' 
 #' # For Bioconductor-container workflow examples, see:
 #' # vignette("Tweedieverse", package = "Tweedieverse")
@@ -188,21 +187,18 @@ Tweedieverse <- function(input_features,
   )
   if (!inherits(input_features, valid_input_classes)) {
     stop(
-      paste(
-        "input_features must be a supported Bioconductor container:",
-        paste(valid_input_classes, collapse = ", "),
-        ". Plain data frames, matrices, lists, and file paths are not supported."
+      sprintf(
+        "input_features must be a supported Bioconductor container: %s. Plain data frames, matrices, lists, and file paths are not supported.",
+        paste(valid_input_classes, collapse = ", ")
       ),
       call. = FALSE
     )
   }
   if (is.character(input_metadata)) {
     stop(
-      paste(
-        "input_metadata file paths are not supported.",
-        "Use colData(input_features), colData on a MultiAssayExperiment,",
-        "or provide input_metadata as a data.frame."
-      ),
+      "input_metadata file paths are not supported. ",
+      "Use colData(input_features), colData on a MultiAssayExperiment, ",
+      "or provide input_metadata as a data.frame.",
       call. = FALSE
     )
   }
@@ -374,10 +370,7 @@ Tweedieverse <- function(input_features,
   } else {
     stop(
       sprintf(
-        paste(
-          "Input data of class <%s> not supported.",
-          "Please use a domain-appropriate Bioconductor container."
-        ),
+        "Input data of class <%s> not supported. Please use a domain-appropriate Bioconductor container.",
         class(input_features)[1]
       )
     )
@@ -412,7 +405,7 @@ Tweedieverse <- function(input_features,
     log_file <- file.path(output, "Tweedieverse.log")
     # Remove log file if already exists (to avoid append)
     if (file.exists(log_file)) {
-      print(paste("Warning: Deleting existing log file:", log_file))
+      warning(sprintf("Deleting existing log file: %s", log_file), call. = FALSE)
       unlink(log_file)
     }
     logging::basicConfig(level = 'FINEST')
@@ -475,10 +468,7 @@ Tweedieverse <- function(input_features,
   # Check if the selected base_model is valid
   if (!base_model %in% model_choices) {
     option_not_valid_error(
-      paste(
-        "Please select an analysis method",
-        "from the list of available options"
-      ),
+      "Please select an analysis method from the list of available options",
       toString(model_choices)
     )
   }
@@ -509,10 +499,7 @@ Tweedieverse <- function(input_features,
   # Check if the selected correction is valid
   if (!correction %in% correction_choices) {
     option_not_valid_error(
-      paste(
-        "Please select a correction method",
-        "from the list of available options"
-      ),
+      "Please select a correction method from the list of available options",
       toString(correction_choices)
     )
   }
@@ -520,10 +507,7 @@ Tweedieverse <- function(input_features,
   # Check if the selected optimizer is valid
   if (!optimizer %in% optimizer_choices) {
     option_not_valid_error(
-      paste(
-        "Please select an optimizer method",
-        "from the list of available options"
-      ),
+      "Please select an optimizer method from the list of available options",
       toString(correction_choices)
     )
   }
@@ -582,10 +566,7 @@ Tweedieverse <- function(input_features,
   prop_options <- c(prev_threshold, max_significance)
   if (any(prop_options < 0) || any(prop_options > 1)) {
     stop(
-      paste(
-        "One of the following is outside [0, 1]:",
-        "prev_threshold, max_significance"
-      )
+      "One of the following is outside [0, 1]: prev_threshold, max_significance"
     )
   }
   
@@ -597,17 +578,15 @@ Tweedieverse <- function(input_features,
   samples_row_row <- intersect(rownames(data), rownames(metadata))
   if (length(samples_row_row) > 0) {
     # this is the expected formatting so do not modify data frames
-    logging::loginfo(paste(
-      "Input format is data samples",
-      "as rows and metadata samples as rows"
-    ))
+    logging::loginfo(
+      "Input format is data samples as rows and metadata samples as rows"
+    )
   } else {
     samples_column_row <- intersect(colnames(data), rownames(metadata))
     if (length(samples_column_row) > 0) {
-      logging::loginfo(paste(
-        "Input format is data samples",
-        "as columns and metadata samples as rows"
-      ))
+      logging::loginfo(
+        "Input format is data samples as columns and metadata samples as rows"
+      )
       # transpose data frame so samples are rows
       data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
       logging::logdebug("linked data so samples are rows")
@@ -615,12 +594,9 @@ Tweedieverse <- function(input_features,
       samples_column_column <-
         intersect(colnames(data), colnames(metadata))
       if (length(samples_column_column) > 0) {
-        logging::loginfo(
-          paste(
-            "Input format is data samples",
-            "as columns and metadata samples as columns"
+          logging::loginfo(
+            "Input format is data samples as columns and metadata samples as columns"
           )
-        )
         data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
         metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
         logging::logdebug("linked data and metadata so samples are rows")
@@ -629,20 +605,13 @@ Tweedieverse <- function(input_features,
           intersect(rownames(data), colnames(metadata))
         if (length(samples_row_column) > 0) {
           logging::loginfo(
-            paste(
-              "Input format is data samples",
-              "as rows and metadata samples as columns"
-            )
+            "Input format is data samples as rows and metadata samples as columns"
           )
           metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
           logging::logdebug("linked metadata so samples are rows")
         } else {
           logging::logerror(
-            paste(
-              "Unable to find samples in data and",
-              "metadata files.",
-              "Rows/columns do not match."
-            )
+            "Unable to find samples in data and metadata files. Rows/columns do not match."
           )
           logging::logdebug("input_features rows: %s",
                             paste(rownames(data), collapse = ","))
@@ -666,11 +635,7 @@ Tweedieverse <- function(input_features,
     setdiff(rownames(data), rownames(metadata))
   if (length(extra_feature_samples) > 0)
     logging::logdebug(
-      paste(
-        "The following samples were found",
-        "to have features but no metadata.",
-        "They will be removed. %s"
-      ),
+      "The following samples were found to have features but no metadata. They will be removed. %s",
       paste(extra_feature_samples, collapse = ",")
     )
   
@@ -679,11 +644,7 @@ Tweedieverse <- function(input_features,
     setdiff(rownames(metadata), rownames(data))
   if (length(extra_metadata_samples) > 0)
     logging::logdebug(
-      paste(
-        "The following samples were found",
-        "to have metadata but no features.",
-        "They will be removed. %s"
-      ),
+      "The following samples were found to have metadata but no features. They will be removed. %s",
       paste(extra_metadata_samples, collapse = ",")
     )
   
@@ -719,8 +680,10 @@ Tweedieverse <- function(input_features,
     }
     # respect ordering if a factor is explicitly passed in with no reference set
     if (is.factor(metadata[,i]) && !(i %in% split_reference)) {
-      logging::loginfo(paste("Factor detected for categorial metadata '", 
-                             i, "'. Provide a reference argument or manually set factor ordering to change reference level.", sep=""))
+      logging::loginfo(
+        "Factor detected for categorial metadata '%s'. Provide a reference argument or manually set factor ordering to change reference level.",
+        i
+      )
       next
     }
     
@@ -740,9 +703,11 @@ Tweedieverse <- function(input_features,
       if (!is.na(ref)) {
         metadata[, i] <- stats::relevel(metadata[, i], ref = ref)
       } else {
-        stop(paste("Please provide the reference for the variable '",
-                   i, "' which includes more than 2 levels: ",
-                   paste(as.character(mlevels), collapse=", "), ".", sep=""))   
+        stop(sprintf(
+          "Please provide the reference for the variable '%s' which includes more than 2 levels: %s.",
+          i,
+          paste(as.character(mlevels), collapse = ", ")
+        ))
       } 
     } else {
       stop("Provided categorical metadata has fewer than 2 unique, non-NA values.")
@@ -764,10 +729,7 @@ Tweedieverse <- function(input_features,
   logging::loginfo("Total samples in data: %d", total_samples)
   min_samples <- total_samples * prev_threshold
   logging::loginfo(
-    paste(
-      "Min samples required with min abundance",
-      "for a feature not to be filtered: %f"
-    ),
+    "Min samples required with min abundance for a feature not to be filtered: %f",
     min_samples
   )
   
@@ -814,48 +776,38 @@ Tweedieverse <- function(input_features,
   has_negative_data <- any(as.matrix(final_features) < 0, na.rm = TRUE)
   if (is.null(tweedie_p) && has_negative_data) {
     message(
-      paste(
-        "Negative feature values detected after filtering;",
-        "p = 0 is the only Tweedie index whose support includes negative values.",
-        "Setting tweedie_p = 0."
-      )
+      "Negative feature values detected after filtering; ",
+      "p = 0 is the only Tweedie index whose support includes negative values. ",
+      "Setting tweedie_p = 0."
     )
     tweedie_p <- 0
   } else if (!is.null(tweedie_p) && tweedie_p != 0 && has_negative_data) {
     stop(
-      paste(
-        "Negative feature values are supported only when tweedie_p = 0.",
-        "Set tweedie_p = 0, leave tweedie_p unspecified, or transform the negatives away."
-      )
+      "Negative feature values are supported only when tweedie_p = 0. ",
+      "Set tweedie_p = 0, leave tweedie_p unspecified, or transform the negatives away."
     )
   }
 
   if (!is.null(tweedie_p) && tweedie_p < 0) {
     warning(
-      paste(
-        "Negative Tweedie variance powers are rarely used.",
-        "The model will run at the supplied tweedie_p, but requires strictly positive fitted means."
-      ),
+      "Negative Tweedie variance powers are rarely used. ",
+      "The model will run at the supplied tweedie_p, but requires strictly positive fitted means.",
       call. = FALSE
     )
   }
 
   if (!is.null(tweedie_p) && tweedie_p == 0 && link != "identity") {
     message(
-      paste(
-        "tweedie_p = 0 uses the Gaussian variance case;",
-        "setting link = 'identity' because the requested link is undefined for negative responses."
-      )
+      "tweedie_p = 0 uses the Gaussian variance case; ",
+      "setting link = 'identity' because the requested link is undefined for negative responses."
     )
     link <- "identity"
   }
 
   if (!is.null(tweedie_p) && tweedie_p == 0 && adjust_offset) {
     message(
-      paste(
-        "tweedie_p = 0 with identity link does not use a log(scale_factor) offset;",
-        "setting adjust_offset = FALSE."
-      )
+      "tweedie_p = 0 with identity link does not use a log(scale_factor) offset; ",
+      "setting adjust_offset = FALSE."
     )
     adjust_offset <- FALSE
   }
@@ -892,10 +844,7 @@ Tweedieverse <- function(input_features,
   temp_filtered_metadata <- unfiltered_metadata[, apply(unfiltered_metadata, 2, entropy) > entropy_threshold, drop = FALSE]
   excluded_metadata <- setdiff(colnames(unfiltered_metadata), colnames(temp_filtered_metadata))
   logging::loginfo(
-    paste(
-      "Excluded metadata with",
-      "entropy less or equal to %s: %s"
-    ),
+    "Excluded metadata with entropy less or equal to %s: %s",
     entropy_threshold, paste(excluded_metadata, collapse = ",")
   )
   filtered_metadata <- temp_filtered_metadata
@@ -918,10 +867,7 @@ Tweedieverse <- function(input_features,
     to_remove <- setdiff(fixed_effects, colnames(filtered_metadata))
     if (length(to_remove) > 0)
       logging::logwarn(
-        paste(
-          "Feature name not found in metadata",
-          "so not applied to formula as fixed effect: %s"
-        ),
+        "Feature name not found in metadata so not applied to formula as fixed effect: %s",
         paste(to_remove, collapse = " , ")
       )
     fixed_effects <- setdiff(fixed_effects, to_remove)
@@ -939,10 +885,7 @@ Tweedieverse <- function(input_features,
       setdiff(random_effects, colnames(filtered_metadata))
     if (length(to_remove) > 0)
       logging::logwarn(
-        paste(
-          "Feature name not found in metadata",
-          "so not applied to formula as random effect: %s"
-        ),
+        "Feature name not found in metadata so not applied to formula as random effect: %s",
         paste(to_remove, collapse = " , ")
       )
     random_effects <- setdiff(random_effects, to_remove)
@@ -965,8 +908,8 @@ Tweedieverse <- function(input_features,
           as.formula(random_effects_formula_text),
           error = function(e)
             stop(
-              paste(
-                "Invalid formula for random effects: ",
+              sprintf(
+                "Invalid formula for random effects: %s",
                 random_effects_formula_text
               )
             )
@@ -988,9 +931,8 @@ Tweedieverse <- function(input_features,
       as.formula(formula_text),
       error = function(e)
         stop(
-          paste(
-            "Invalid formula.",
-            "Please provide a different formula: ",
+          sprintf(
+            "Invalid formula. Please provide a different formula: %s",
             formula_text
           )
         )
@@ -1183,11 +1125,7 @@ Tweedieverse <- function(input_features,
   significant_results_file <-
     file.path(output, "significant_results.tsv")
   logging::loginfo(
-    paste(
-      "Writing the significant results",
-      "(those which are less than or equal to the threshold",
-      "of %f ) to file (ordered by increasing q-values): %s"
-    ),
+    "Writing the significant results (those which are less than or equal to the threshold of %f) to file (ordered by increasing q-values): %s",
     max_significance,
     significant_results_file
   )
@@ -1235,11 +1173,7 @@ Tweedieverse <- function(input_features,
   
   if (plot_scatter) {
     logging::loginfo(
-      paste(
-        "Writing association plots",
-        "(one for each significant association)",
-        "to output folder: %s"
-      ),
+      "Writing association plots (one for each significant association) to output folder: %s",
       output
     )
     association_plots(
@@ -1256,7 +1190,7 @@ Tweedieverse <- function(input_features,
 
 
 option_not_valid_error <- function(message, valid_options) {
-  logging::logerror(paste(message, ": %s"), toString(valid_options))
+  logging::logerror("%s: %s", message, toString(valid_options))
   stop("Option not valid", call. = FALSE)
 }
 
@@ -1265,6 +1199,7 @@ utils::globalVariables(c(
   "base.model",
   "base.model_abundance",
   "base.model_presence",
+  "bin",
   "coef",
   "coef_abundance",
   "coef_presence",

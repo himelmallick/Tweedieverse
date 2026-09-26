@@ -85,10 +85,10 @@ IG_numeric<-function(data, feature, target, bins=4) {
   #compute entropy for the parent
   e0<-entropy(data[,target])
   
-  data$cat<-cut(data[,feature], breaks = bins, labels = seq_len(bins))
+  data$bin<-cut(data[,feature], breaks = bins, labels = seq_len(bins))
   
   #use dplyr to compute e and p for each value of the feature
-  dd_data <- data %>% dplyr::group_by(cat) %>% dplyr::summarise(
+  dd_data <- data %>% dplyr::group_by(bin) %>% dplyr::summarise(
     e = entropy(get(target)),
     n = length(get(target)),
     min = min(get(feature)),
@@ -105,8 +105,8 @@ IG_numeric<-function(data, feature, target, bins=4) {
 
 
 
-#returns IG for categorical variables.
-IG_cat<-function(data,feature,target){
+# returns IG for factor variables.
+IG_discrete<-function(data,feature,target){
   #Strip out rows where feature is NA
   data<-data[!is.na(data[,feature]),] 
   #use dplyr to compute e and p for each value of the feature
@@ -196,10 +196,8 @@ parse_effect_names <- function(effects) {
   effects <- as.character(effects)
   if (any(grepl(",", effects, fixed = TRUE))) {
     stop(
-      paste(
-        "fixed_effects and random_effects must be character vectors.",
-        "Use c(\"diagnosis\", \"antibiotics\") instead of \"diagnosis,antibiotics\"."
-      )
+      "fixed_effects and random_effects must be character vectors. ",
+      "Use c(\"diagnosis\", \"antibiotics\") instead of \"diagnosis,antibiotics\"."
     )
   }
   effects <- trimws(effects)
@@ -251,7 +249,7 @@ p0_transform_features <- function(features,
   } else if (transform == "ARC_SIGNED_SQRT") {
     z <- sign(x) * sqrt(abs(x))
   } else {
-    stop(paste("Unsupported p0_transform:", transform))
+    stop(sprintf("Unsupported p0_transform: %s", transform))
   }
 
   z <- as.data.frame(z)
@@ -276,16 +274,15 @@ domain_bioc_container_map <- function() {
 validate_domain_bioc_container <- function(input, domain) {
   allowed <- domain_bioc_container_map()[[domain]]
   if (is.null(allowed)) {
-    stop(paste("Unknown domain:", domain))
+    stop(sprintf("Unknown domain: %s", domain))
   }
 
   if (!inherits(input, allowed)) {
     stop(
-      paste(
-        "For domain =", domain,
-        "Bioconductor input must inherit from one of:",
-        paste(allowed, collapse = ", "),
-        ". Plain data frames, matrices, lists, and file paths are not supported as input_features."
+      sprintf(
+        "For domain = %s, Bioconductor input must inherit from one of: %s. Plain data frames, matrices, lists, and file paths are not supported as input_features.",
+        domain,
+        paste(allowed, collapse = ", ")
       )
     )
   }
@@ -297,10 +294,10 @@ extractAssay <- function(input, assay_name = "counts") {
   # Extract assay name based on the user input
   if (assay_name %in% SummarizedExperiment::assayNames(input)) {
     counts_data <- SummarizedExperiment::assay(input, assay_name)
-    cat("The specified assay has been extracted\n")
+    message("The specified assay has been extracted")
     return(as.data.frame(as.matrix(counts_data)))
   } else {
-    cat("The specified assay was not found\n")
+    message("The specified assay was not found")
     return(NULL)
   }
 }
@@ -312,10 +309,8 @@ is_multiassay_experiment <- function(input) {
 extract_multiassay_experiments <- function(input) {
   if (!requireNamespace("MultiAssayExperiment", quietly = TRUE)) {
     stop(
-      paste(
-        "MultiAssayExperiment input requires the MultiAssayExperiment package.",
-        "Please install it or provide a single-omics input."
-      )
+      "MultiAssayExperiment input requires the MultiAssayExperiment package. ",
+      "Please install it or provide a single-omics input."
     )
   }
   experiments <- MultiAssayExperiment::experiments(input)
@@ -335,10 +330,8 @@ extract_multiassay_metadata <- function(input, input_metadata = NULL) {
   metadata <- as.data.frame(SummarizedExperiment::colData(input))
   if (nrow(metadata) == 0L) {
     stop(
-      paste(
-        "MultiAssayExperiment input needs sample metadata.",
-        "Provide input_metadata or populate colData(input_features)."
-      )
+      "MultiAssayExperiment input needs sample metadata. ",
+      "Provide input_metadata or populate colData(input_features)."
     )
   }
   metadata
@@ -351,10 +344,7 @@ coerce_multiassay_experiment_input <- function(experiment) {
   }
   stop(
     sprintf(
-      paste(
-        "MultiAssayExperiment experiment of class <%s> is not supported.",
-        "Use domain-appropriate Bioconductor experiments only."
-      ),
+      "MultiAssayExperiment experiment of class <%s> is not supported. Use domain-appropriate Bioconductor experiments only.",
       class(experiment)[1]
     )
   )
@@ -525,10 +515,7 @@ resolve_tweedieverse_normalization <- function(domain,
   all_choices <- c("TSS", "GMPR", "CSS", "SCRAN", "TMM", "RLE", "CPM", "MEDIAN", "NONE")
   if (!normalization %in% all_choices) {
     stop(
-      paste(
-        "normalization must be one of:",
-        paste(all_choices, collapse = ", ")
-      )
+      sprintf("normalization must be one of: %s", paste(all_choices, collapse = ", "))
     )
   }
 
@@ -541,10 +528,10 @@ resolve_tweedieverse_normalization <- function(domain,
   )
   if (!normalization %in% domain_choices) {
     stop(
-      paste(
-        "normalization =", normalization,
-        "is not supported for domain =", domain,
-        ". Supported choices are:",
+      sprintf(
+        "normalization = %s is not supported for domain = %s. Supported choices are: %s",
+        normalization,
+        domain,
         paste(domain_choices, collapse = ", ")
       )
     )
@@ -556,10 +543,10 @@ resolve_tweedieverse_normalization <- function(domain,
 validate_tweedieverse_size_factor <- function(size_factor, label = "size factor") {
   size_factor <- as.numeric(size_factor)
   if (any(!is.finite(size_factor)) || any(is.na(size_factor))) {
-    stop(paste(label, "must contain only finite numeric values."))
+    stop(sprintf("%s must contain only finite numeric values.", label))
   }
   if (any(size_factor <= 0)) {
-    stop(paste(label, "must be strictly positive because Tweedieverse uses log(size_factor) as an offset."))
+    stop(sprintf("%s must be strictly positive because Tweedieverse uses log(size_factor) as an offset.", label))
   }
   size_factor
 }
@@ -577,8 +564,8 @@ compute_tweedieverse_size_factor <- function(features,
   if (!is.null(scale_factor)) {
     if (!scale_factor %in% colnames(metadata)) {
       stop(
-        paste(
-          "The specified scale_factor variable is not present in the metadata table:\n",
+        sprintf(
+          "The specified scale_factor variable is not present in the metadata table:\n%s",
           scale_factor
         )
       )
@@ -600,7 +587,7 @@ compute_tweedieverse_size_factor <- function(features,
 
   if (normalization %in% c("TSS", "CPM")) {
     if (any(x < 0, na.rm = TRUE)) {
-      stop(paste(normalization, "size factors require non-negative features."))
+      stop(sprintf("%s size factors require non-negative features.", normalization))
     }
     return(center_tweedieverse_size_factor(rowSums(x, na.rm = TRUE)))
   }
@@ -617,7 +604,7 @@ compute_tweedieverse_size_factor <- function(features,
   }
 
   if (any(x < 0, na.rm = TRUE)) {
-    stop(paste(normalization, "size factors require non-negative features."))
+    stop(sprintf("%s size factors require non-negative features.", normalization))
   }
 
   if (normalization == "RLE") {
@@ -640,7 +627,7 @@ compute_tweedieverse_size_factor <- function(features,
     return(compute_scran_size_factor(x))
   }
 
-  stop(paste("Unsupported normalization:", normalization))
+  stop(sprintf("Unsupported normalization: %s", normalization))
 }
 
 compute_rle_size_factor <- function(x) {
@@ -779,57 +766,6 @@ compute_scran_size_factor <- function(x) {
 #'   qval = c(0.02, 0.25)
 #' )
 #' median_comparison_tweedie(toy, n_sims = 100)
-#'
-#' \dontrun{
-#' 
-#' ######################
-#' # HMP2 input_features Analysis #
-#' ######################
-#'
-#' #############
-#' # Load input_features #
-#' #############
-#' 
-#' library(data.table)
-#' input_features <- fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_taxonomy.tsv", sep ="\t")
-#' input_metadata <-fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv", sep ="\t")
-#'
-#' ###############
-#' # Format data #
-#' ###############
-#'
-#' library(tibble)
-#' features<- column_to_rownames(input_features, 'ID')
-#' metadata<- column_to_rownames(input_metadata, 'ID')
-#'
-#' #############
-#' # Fit Model #
-#' #############
-#'
-#' library(Tweedieverse)
-#' HMP2 <- Tweedieverse(
-#' features,
-#' metadata,
-#' output = './demo_output/HMP2', # Assuming demo_output exists
-#' fixed_effects = c('diagnosis', 'dysbiosisnonIBD','dysbiosisUC','dysbiosisCD', 'antibiotics', 'age'),
-#' random_effects = c('site', 'subject'),
-#' base_model = 'CPLM',
-#' adjust_offset = FALSE, # No offset as the values are relative abundances
-#' cores = 8, # Make sure your computer has the capability
-#' median_comparison = TRUE,
-#' median_subtraction = TRUE,
-#' standardize = FALSE,
-#' reference = c('diagnosis,nonIBD'))
-#' 
-#' HMP2_adj <- median_comparison_tweedie(HMP2,
-#'                                         p_cutoff = 0.95,
-#'                                         subtract_median = TRUE,
-#'                                         n_sims = 10000,
-#'                                         median_threshold = 0)
-#'
-#' head(HMP2_adj[, c("taxon", "metadata", "coef_median", "pval_median")])
-#' 
-#' }
 #'
 #' @export
 median_comparison_tweedie <- function(df,

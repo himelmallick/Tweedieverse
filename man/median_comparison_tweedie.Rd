@@ -78,57 +78,6 @@ toy <- data.frame(
 )
 median_comparison_tweedie(toy, n_sims = 100)
 
-\dontrun{
-
-######################
-# HMP2 input_features Analysis #
-######################
-
-#############
-# Load input_features #
-#############
-
-library(data.table)
-input_features <- fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_taxonomy.tsv", sep ="\t")
-input_metadata <-fread("https://raw.githubusercontent.com/biobakery/Maaslin2/master/inst/extdata/HMP2_metadata.tsv", sep ="\t")
-
-###############
-# Format data #
-###############
-
-library(tibble)
-features<- column_to_rownames(input_features, 'ID')
-metadata<- column_to_rownames(input_metadata, 'ID')
-
-#############
-# Fit Model #
-#############
-
-library(Tweedieverse)
-HMP2 <- Tweedieverse(
-features,
-metadata,
-output = './demo_output/HMP2', # Assuming demo_output exists
-fixed_effects = c('diagnosis', 'dysbiosisnonIBD','dysbiosisUC','dysbiosisCD', 'antibiotics', 'age'),
-random_effects = c('site', 'subject'),
-base_model = 'CPLM',
-adjust_offset = FALSE, # No offset as the values are relative abundances
-cores = 8, # Make sure your computer has the capability
-median_comparison = TRUE,
-median_subtraction = TRUE,
-standardize = FALSE,
-reference = c('diagnosis,nonIBD'))
-
-HMP2_adj <- median_comparison_tweedie(HMP2,
-                                        p_cutoff = 0.95,
-                                        subtract_median = TRUE,
-                                        n_sims = 10000,
-                                        median_threshold = 0)
-
-head(HMP2_adj[, c("taxon", "metadata", "coef_median", "pval_median")])
-
-}
-
 }
 \seealso{
 [MaAsLin 3 GitHub](https://github.com/biobakery/maaslin3)

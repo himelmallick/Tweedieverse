@@ -1,3 +1,11 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^.*\.Rcheck(/|$)
+^.*\.BiocCheck(/|$)
+^.*\.tar\.gz$
+^\.DS_Store$
+^R/\.Rhistory$
+^\.Rhistory$
+^inst/\.DS_Store$
+^tests/\.DS_Store$

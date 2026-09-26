@@ -68,6 +68,19 @@ theme_omicsEye <- function() list(
   )
 )
 
+draw_tweedieverse_plot <- function(plot_object) {
+  if (is.null(plot_object)) {
+    return(invisible(NULL))
+  }
+  if (inherits(plot_object, "ggplot")) {
+    grid::grid.draw(ggplot2::ggplotGrob(plot_object))
+  } else if (!is.null(plot_object$gtable)) {
+    grid::grid.draw(plot_object$gtable)
+  } else {
+    grid::grid.draw(plot_object)
+  }
+}
+
 
 
 # Tweedieverse heatmap function for overall view of associations
@@ -133,14 +146,14 @@ Tweedieverse_heatmap <-
         df <- df[order(df[[cell_value]]),]
       }
       # get the top n features with significant associations
-      df_sub <- df[1:first_n, ]
+      df_sub <- df[seq_len(first_n), , drop = FALSE]
       for (first_n_index in seq(first_n, dim(df)[1]))
       {
         if (length(unique(df_sub$feature)) == first_n)
         {
           break
         }
-        df_sub <- df[1:first_n_index, ]
+        df_sub <- df[seq_len(first_n_index), , drop = FALSE]
       }
       # get all rows that have the top N features
       df <- df[which(df$feature %in% df_sub$feature), ]
@@ -148,7 +161,7 @@ Tweedieverse_heatmap <-
     }
 
     if (dim(df)[1] < 2) {
-      print('There are no associations to plot!')
+      message("There are no associations to plot!")
       return(NULL)
     }
 
@@ -204,28 +217,24 @@ Tweedieverse_heatmap <-
     m <- length(unique(verbose_metadata))
 
     if (n < 2) {
-      print(
-        paste(
-          "There is not enough features in the associations",
-          "to create a heatmap plot.",
-          "Please review the associations in text output file."
-        )
+      message(
+        "There is not enough features in the associations ",
+        "to create a heatmap plot. ",
+        "Please review the associations in text output file."
       )
       return(NULL)
     }
 
     if (m < 2) {
-      print(
-        paste(
-          "There is not enough metadata in the associations",
-          "to create a heatmap plot.",
-          "Please review the associations in text output file."
-        )
+      message(
+        "There is not enough metadata in the associations ",
+        "to create a heatmap plot. ",
+        "Please review the associations in text output file."
       )
       return(NULL)
     }
 
-    a = matrix(0, nrow = n, ncol = m)
+    a <- matrix(0, nrow = n, ncol = m)
     a <- as.data.frame(a)
 
     rownames(a) <- unique(data)
@@ -312,7 +321,7 @@ save_heatmap <-
 
     if (!is.null(heatmap)) {
       pdf(heatmap_file)
-      print(heatmap)
+      draw_tweedieverse_plot(heatmap)
       dev.off()
 
       jpg_file <- file.path(figures_folder, "heatmap.jpg")
@@ -320,7 +329,7 @@ save_heatmap <-
            res = 150,
            height = 800,
            width = 1100)
-      print(heatmap)
+      draw_tweedieverse_plot(heatmap)
       dev.off()
     }
 
@@ -366,7 +375,7 @@ association_plots <-
     }
 
     if (dim(output_df_all)[1] < 1) {
-      print('There are no associations to plot!')
+      message("There are no associations to plot!")
       return(NULL)
     }
 
@@ -550,7 +559,7 @@ association_plots <-
             ) + ggplot2::scale_y_log10()
         }
         stdout <-
-          capture.output(print(temp_plot), type = "message")
+          capture.output(draw_tweedieverse_plot(temp_plot), type = "message")
         if (length(stdout) > 0)
           logging::logdebug(stdout)
         if (count < max_jpgs + 1)
@@ -574,7 +583,7 @@ association_plots <-
              width = 960,
              height = 960)
         stdout <-
-          capture.output(print(saved_plots[[plot_number]]))
+          capture.output(draw_tweedieverse_plot(saved_plots[[plot_number]]))
         dev.off()
       }
       saveRDS(saved_ggs,
@@ -608,12 +617,11 @@ tweedie_index_plot <-
     }
 
     if (dim(output_df_all)[1] < 1) {
-      print('There are no associations to plot!')
+      message("There are no associations to plot!")
       return(NULL)
     }
 
-    logging::loginfo(paste("Plotting tweedie.index ",
-                           "colored by metadata"))
+    logging::loginfo("Plotting tweedie.index colored by metadata")
     plot_file <-
       paste(figures_folder,
             "/tweedie_index_plot.pdf",
@@ -637,7 +645,7 @@ tweedie_index_plot <-
 
     # print the saved figures
     tdout <-
-      capture.output(print(temp_plot), type = "message")
+      capture.output(draw_tweedieverse_plot(temp_plot), type = "message")
     dev.off()
     jpg_file <- paste(figures_folder,
                       "/tweedie_index_plot.jpg",
@@ -647,7 +655,7 @@ tweedie_index_plot <-
          width = 960,
          height = 600)
     stdout <-
-      capture.output(print(temp_plot))
+      capture.output(draw_tweedieverse_plot(temp_plot))
     dev.off()
     saveRDS(temp_plot,
             file = paste(figures_folder,

@@ -201,7 +201,6 @@ fit <- Tweedieverse(
 )
 head(fit)
 
-\dontrun{
 maaslin2_median_fit <- Tweedieverse(
   input_features = experiment,
   output = NULL,
@@ -212,7 +211,6 @@ maaslin2_median_fit <- Tweedieverse(
   median_subtraction = TRUE,
   cores = 1
 )
-}
 
 # For Bioconductor-container workflow examples, see:
 # vignette("Tweedieverse", package = "Tweedieverse")

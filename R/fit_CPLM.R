@@ -319,7 +319,7 @@ fit.CPLM <- function(features,
         output$para <- summary_function(fit)
       }
       else{
-        logging::logwarn(paste("Fitting problem for feature", x, "returning NA"))
+        logging::logwarn("Fitting problem for feature %s returning NA", x)
         output$para <-
           as.data.frame(matrix(NA,  nrow = length(metadata_names), ncol = 5))
         output$para$name <-
