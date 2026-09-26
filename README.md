@@ -1,6 +1,6 @@
 Tweedieverse: Differential Analysis of Omics Data Based on the Tweedie Distribution
 ================
-Himel Mallick, Ali Rahnavard
+Nalin Arora, Ziyu Liu, Ali Rahnavard,Himel Mallick
 <img src="docs/logo.jpg" align="right" width="365px"/>
 
 - [Introduction](#introduction)
