@@ -1,0 +1,24 @@
+bibentry(
+  bibtype = "Article",
+  title = "Differential expression of single-cell RNA-seq data using Tweedie models",
+  author = c(
+    person("Himel", "Mallick"),
+    person("Sayantan", "Chatterjee"),
+    person("Subhajit", "Chowdhury"),
+    person("Sayan", "Chatterjee"),
+    person("Ali", "Rahnavard"),
+    person("Stephanie C.", "Hicks")
+  ),
+  journal = "Statistics in Medicine",
+  year = "2022",
+  volume = "41",
+  number = "18",
+  pages = "3492-3510",
+  doi = "10.1002/sim.9430",
+  textVersion = paste(
+    "Mallick H, Chatterjee S, Chowdhury S, Chatterjee S, Rahnavard A,",
+    "Hicks SC. Differential expression of single-cell RNA-seq data using",
+    "Tweedie models. Statistics in Medicine. 2022; 41(18): 3492-3510.",
+    "doi:10.1002/sim.9430"
+  )
+)
