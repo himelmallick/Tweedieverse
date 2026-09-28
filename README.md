@@ -296,6 +296,24 @@ fit <- Tweedieverse(
 
 The alias `method.args` is also supported for compatibility, but only one of `method_args` or `method.args` should be supplied in a single call.
 
+Parallel Execution
+------------------
+
+Tweedieverse uses `BiocParallel` for feature-wise model fitting.
+By default it uses `BiocParallel::SerialParam()`, which is the safest backend
+for examples, tests, and Bioconductor checks.
+
+Users who want parallel execution can pass a `BPPARAM` object:
+
+```r
+fit <- Tweedieverse(
+  input_features = experiment,
+  output = NULL,
+  fixed_effects = "group",
+  BPPARAM = BiocParallel::SnowParam(workers = 4, type = "SOCK")
+)
+```
+
 Basic Usage
 -----------
 
@@ -305,8 +323,7 @@ library(Tweedieverse)
 fit <- Tweedieverse(
   input_features = experiment,
   output = NULL,
-  fixed_effects = "group",
-  cores = 1
+  fixed_effects = "group"
 )
 ```
 
@@ -335,8 +352,7 @@ fit <- Tweedieverse(
   fixed_effects = "group",
   tweedie_p = 1,
   median_comparison = FALSE,
-  max_significance = 1,
-  cores = 1
+  max_significance = 1
 )
 
 head(fit)
@@ -391,8 +407,7 @@ fit <- Tweedieverse(
   run_presence_absence_model = c(
     microbiome = TRUE,
     rnaseq = FALSE
-  ),
-  cores = 1
+  )
 )
 
 names(fit)
@@ -423,7 +438,7 @@ When `run_presence_absence_model = TRUE`, additional abundance-specific and pres
 Getting Started with Tweedieverse
 ---------------------------------
 
-See the package vignette for Bioconductor-container examples covering microbiome relative abundances, single-cell RNA-seq UMI counts, single-cell RNA-seq non-UMI/read counts, and `MultiAssayExperiment` input:
+See the package vignette for Bioconductor-container examples covering microbiome relative abundances, single-cell RNA-seq UMI counts, single-cell RNA-seq non-UMI/read counts, pseudobulk RNA-seq aggregation with `muscat`, bulk RNA-seq counts from the Bioconductor `airway` dataset, and `MultiAssayExperiment` input:
 
 ```r
 vignette("Tweedieverse", package = "Tweedieverse")

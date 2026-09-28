@@ -87,12 +87,13 @@ IG_numeric<-function(data, feature, target, bins=4) {
   
   data$bin<-cut(data[,feature], breaks = bins, labels = seq_len(bins))
   
-  #use dplyr to compute e and p for each value of the feature
-  dd_data <- data %>% dplyr::group_by(bin) %>% dplyr::summarise(
-    e = entropy(get(target)),
-    n = length(get(target)),
-    min = min(get(feature)),
-    max = max(get(feature))
+  # compute entropy for each bin without relying on dplyr NSE
+  grouped <- split(data, data$bin)
+  dd_data <- data.frame(
+    e = vapply(grouped, function(x) entropy(x[[target]]), numeric(1)),
+    n = vapply(grouped, nrow, integer(1)),
+    min = vapply(grouped, function(x) min(x[[feature]]), numeric(1)),
+    max = vapply(grouped, function(x) max(x[[feature]]), numeric(1))
   )
   
   #calculate p for each value of feature
@@ -109,10 +110,11 @@ IG_numeric<-function(data, feature, target, bins=4) {
 IG_discrete<-function(data,feature,target){
   #Strip out rows where feature is NA
   data<-data[!is.na(data[,feature]),] 
-  #use dplyr to compute e and p for each value of the feature
-  dd_data <- data %>% dplyr::group_by_at(feature) %>% dplyr::summarise(
-    e = entropy(get(target)),
-    n = length(get(target))
+  # compute entropy for each level without relying on dplyr NSE
+  grouped <- split(data, data[[feature]])
+  dd_data <- data.frame(
+    e = vapply(grouped, function(x) entropy(x[[target]]), numeric(1)),
+    n = vapply(grouped, nrow, integer(1))
   )
   
   #compute entropy for the parent
@@ -415,7 +417,7 @@ run_multiassay_tweedieverse <- function(input_features,
                                         method_args = NULL,
                                         method.args = NULL,
                                         standardize = TRUE,
-                                        cores = 1,
+                                        BPPARAM = BiocParallel::SerialParam(),
                                         optimizer = "nlminb",
                                         na.action = na.exclude,
                                         plot_heatmap = FALSE,
@@ -472,7 +474,7 @@ run_multiassay_tweedieverse <- function(input_features,
       run_presence_absence_model = resolve_multiomics_arg(run_presence_absence_model, omics_name, omics_names, "run_presence_absence_model"),
       method_args = resolve_multiomics_arg(method_args, omics_name, omics_names, "method_args"),
       standardize = resolve_multiomics_arg(standardize, omics_name, omics_names, "standardize"),
-      cores = resolve_multiomics_arg(cores, omics_name, omics_names, "cores"),
+      BPPARAM = resolve_multiomics_arg(BPPARAM, omics_name, omics_names, "BPPARAM"),
       optimizer = resolve_multiomics_arg(optimizer, omics_name, omics_names, "optimizer"),
       na.action = na.action,
       plot_heatmap = resolve_multiomics_arg(plot_heatmap, omics_name, omics_names, "plot_heatmap"),
@@ -487,6 +489,21 @@ run_multiassay_tweedieverse <- function(input_features,
   names(results) <- omics_names
   class(results) <- c("TweedieverseMultiAssayResult", class(results))
   results
+}
+
+resolve_tweedieverse_bpparam <- function(BPPARAM = BiocParallel::SerialParam()) {
+  if (!inherits(BPPARAM, "BiocParallelParam")) {
+    stop("BPPARAM must be a BiocParallelParam object.")
+  }
+  BPPARAM
+}
+
+bpparam_worker_count <- function(BPPARAM) {
+  workers <- BiocParallel::bpnworkers(BPPARAM)
+  if (length(workers) != 1L || is.na(workers) || !is.finite(workers) || workers < 1) {
+    return(1L)
+  }
+  as.integer(workers)
 }
 
 resolve_tweedieverse_normalization <- function(domain,
@@ -989,7 +1006,7 @@ fit_presence_absence_model <- function(features,
                                        formula,
                                        random_effects_formula = NULL,
                                        correction = "BH",
-                                       cores = 1,
+                                       BPPARAM = BiocParallel::SerialParam(),
                                        na.action = na.exclude) {
   if (!is.null(random_effects_formula) &&
       !requireNamespace("glmmTMB", quietly = TRUE)) {
@@ -1011,28 +1028,9 @@ fit_presence_absence_model <- function(features,
   }
   metadata_names <- setdiff(colnames(metadata), "offset")
 
-  cluster <- NULL
-  if (cores > 1) {
-    logging::loginfo("Creating cluster of %s R processes for presence-absence models", cores)
-    cluster <- parallel::makeCluster(cores)
-    parallel::clusterExport(
-      cluster,
-      c(
-        "features",
-        "metadata",
-        "presence_formula",
-        "has_random_effects",
-        "log_offset",
-        "na.action",
-        "fit_augmented_presence_model",
-        "augment_presence_data",
-        "presence_augmentation_weight"
-      ),
-      envir = environment()
-    )
-  }
+  BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
 
-  outputs <- pbapply::pblapply(seq_len(ncol(features)), cl = cluster, function(x) {
+  outputs <- BiocParallel::bplapply(seq_len(ncol(features)), function(x) {
     expr <- as.integer(features[, x] > 0)
     data_sub <- data.frame(metadata, expr = expr)
 
@@ -1076,11 +1074,7 @@ fit_presence_absence_model <- function(features,
     colnames(para) <- c("coef", "stderr", "pval", "base.model", "tweedie.index", "name")
     para$feature <- colnames(features)[x]
     para
-  })
-
-  if (!is.null(cluster)) {
-    parallel::stopCluster(cluster)
-  }
+  }, BPPARAM = BPPARAM)
 
   paras <- do.call(rbind, outputs)
   paras$qval <- as.numeric(stats::p.adjust(paras$pval, method = correction))

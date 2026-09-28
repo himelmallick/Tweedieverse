@@ -84,7 +84,7 @@
 #' user-supplied values override Tweedieverse defaults.
 #' @param method.args Alias for \code{method_args}.
 #' @param standardize Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.
-#' @param cores An integer that indicates the number of R processes to run in parallel. Default is 1.
+#' @param BPPARAM \code{\link[BiocParallel]{BiocParallelParam}} object controlling Bioconductor-native parallel evaluation. Default is \code{\link[BiocParallel]{SerialParam}}.
 #' @param optimizer The optimization routine to be used for estimating the parameters of the Tweedie model.
 #' Possible choices are \code{"nlminb"} (the default, see \code{\link[stats]{nlminb}}),
 #' \code{"bobyqa"} (\code{\link[minqa]{bobyqa}}), and \code{"L-BFGS-B"} (\code{\link[stats]{optim}}).
@@ -101,7 +101,6 @@
 #' @importFrom SummarizedExperiment colData
 #' @importClassesFrom TreeSummarizedExperiment TreeSummarizedExperiment
 #' @importFrom dplyr %>% everything
-#' @importFrom parallel clusterExport
 #' @return For single-omics input, a data frame containing coefficient estimates, p-values,
 #' and q-values (multiplicity-adjusted p-values) is returned. For \code{MultiAssayExperiment}
 #' input, a named list of omics-specific result data frames is returned.
@@ -127,7 +126,7 @@
 #'   output = NULL,
 #'   fixed_effects = "group",
 #'   median_comparison = FALSE,
-#'   cores = 1
+#'   BPPARAM = BiocParallel::SerialParam()
 #' )
 #' head(fit)
 #' 
@@ -139,7 +138,7 @@
 #'   Maaslin2_run = TRUE,
 #'   median_comparison = TRUE,
 #'   median_subtraction = TRUE,
-#'   cores = 1
+#'   BPPARAM = BiocParallel::SerialParam()
 #' )
 #' 
 #' # For Bioconductor-container workflow examples, see:
@@ -174,7 +173,7 @@ Tweedieverse <- function(input_features,
                          method_args = NULL,
                          method.args = NULL,
                          standardize = TRUE,
-                         cores = 1,
+                         BPPARAM = BiocParallel::SerialParam(),
                          optimizer = "nlminb",
                          na.action = na.exclude,
                          plot_heatmap = FALSE,
@@ -233,7 +232,7 @@ Tweedieverse <- function(input_features,
       method_args = method_args,
       method.args = method.args,
       standardize = standardize,
-      cores = cores,
+      BPPARAM = BPPARAM,
       optimizer = optimizer,
       na.action = na.action,
       plot_heatmap = plot_heatmap,
@@ -272,7 +271,7 @@ Tweedieverse <- function(input_features,
     method_args = method_args,
     method.args = method.args,
     standardize = standardize,
-    cores = cores,
+    BPPARAM = BPPARAM,
     optimizer = optimizer,
     na.action = na.action,
     plot_heatmap = plot_heatmap,
@@ -310,7 +309,7 @@ Tweedieverse <- function(input_features,
                                  method_args = NULL,
                                  method.args = NULL,
                                  standardize = TRUE,
-                                 cores = 1,
+                                 BPPARAM = BiocParallel::SerialParam(),
                                  optimizer = "nlminb",
                                  na.action = na.exclude,
                                  plot_heatmap = FALSE,
@@ -451,7 +450,7 @@ Tweedieverse <- function(input_features,
   logging::logdebug("Method-specific arguments provided: %s",
                     !is.null(method_args) || !is.null(method.args))
   logging::logdebug("Standardize: %s", standardize)
-  logging::logdebug("Cores: %d", cores)
+  logging::logdebug("BiocParallel backend: %s", class(BPPARAM)[1])
   logging::logdebug("Optimization routine: %s", optimizer)
   
   
@@ -1004,7 +1003,7 @@ Tweedieverse <- function(input_features,
     random_effects_formula = random_effects_formula,
     adjust_offset = adjust_offset,
     correction = correction,
-    cores = cores,
+    BPPARAM = BPPARAM,
     optimizer = optimizer,
     na.action = na.action
   )
@@ -1076,7 +1075,7 @@ Tweedieverse <- function(input_features,
       formula = formula,
       random_effects_formula = random_effects_formula,
       correction = correction,
-      cores = cores
+      BPPARAM = BPPARAM
     )
     ordered_results <- combine_abundance_presence_results(
       abundance_results = ordered_results,

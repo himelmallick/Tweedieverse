@@ -33,7 +33,7 @@ Tweedieverse(
   method_args = NULL,
   method.args = NULL,
   standardize = TRUE,
-  cores = 1,
+  BPPARAM = BiocParallel::SerialParam(),
   optimizer = "nlminb",
   na.action = na.exclude,
   plot_heatmap = FALSE,
@@ -153,7 +153,7 @@ user-supplied values override Tweedieverse defaults.}
 
 \item{standardize}{Should continuous metadata be standardized? Default is TRUE. Bypassed for categorical variables.}
 
-\item{cores}{An integer that indicates the number of R processes to run in parallel. Default is 1.}
+\item{BPPARAM}{\code{\link[BiocParallel]{BiocParallelParam}} object controlling Bioconductor-native parallel evaluation. Default is \code{\link[BiocParallel]{SerialParam}}.}
 
 \item{optimizer}{The optimization routine to be used for estimating the parameters of the Tweedie model.
 Possible choices are \code{"nlminb"} (the default, see \code{\link[stats]{nlminb}}),
@@ -196,8 +196,7 @@ fit <- Tweedieverse(
   input_features = experiment,
   output = NULL,
   fixed_effects = "group",
-  median_comparison = FALSE,
-  cores = 1
+  median_comparison = FALSE
 )
 head(fit)
 
@@ -208,8 +207,7 @@ maaslin2_median_fit <- Tweedieverse(
   tweedie_p = 0,
   Maaslin2_run = TRUE,
   median_comparison = TRUE,
-  median_subtraction = TRUE,
-  cores = 1
+  median_subtraction = TRUE
 )
 
 # For Bioconductor-container workflow examples, see:

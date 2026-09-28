@@ -1,8 +1,7 @@
 ---
 title: "Tweedieverse"
-author: "Himel Mallick, Ali Rahnavard"
+author: "Nalin Arora, Ziyu Liu, Ali Rahnavard,Himel Mallick"
 date: "`r BiocStyle::doc_date()`"
-package: "`r if (requireNamespace('Tweedieverse', quietly = TRUE)) BiocStyle::pkg_ver('Tweedieverse') else 'Tweedieverse development version'`"
 output:
   BiocStyle::html_document:
     toc: true
@@ -33,11 +32,14 @@ assays are represented as a `MultiAssayExperiment`. This keeps feature assays,
 sample metadata, and experiment-level annotations together and makes the
 workflow compatible with the broader Bioconductor ecosystem.
 
-This vignette demonstrates four Bioconductor-oriented workflows:
+This vignette demonstrates six Bioconductor-oriented workflows:
 
 - microbiome relative abundances stored in a `TreeSummarizedExperiment`,
 - single-cell RNA-seq UMI counts stored in a `SingleCellExperiment`,
 - single-cell RNA-seq non-UMI/read counts stored in a `SingleCellExperiment`,
+- pseudobulk RNA-seq counts generated with `muscat::aggregateData()`,
+- bulk RNA-seq counts from the Bioconductor `airway` dataset stored in a
+  `SummarizedExperiment`,
 - matched microbiome and metabolomics assays stored in a
   `MultiAssayExperiment`.
 
@@ -91,7 +93,8 @@ library(SummarizedExperiment)
 library(SingleCellExperiment)
 library(TreeSummarizedExperiment)
 library(MultiAssayExperiment)
-
+library(muscat)
+library(airway)
 ```
 
 ## Loading Packaged Example Data
@@ -130,8 +133,7 @@ microbiome_fit <- Tweedieverse(
   normalization = "NONE",
   fixed_effects = c("diagnosis", "antibiotics"),
   tweedie_p = NULL,
-  median_comparison = FALSE,
-  cores = 1
+  median_comparison = FALSE
 )
 
 head(microbiome_fit)
@@ -157,8 +159,7 @@ umi_fit <- Tweedieverse(
   normalization = "SCRAN",
   fixed_effects = c("condition", "batch"),
   tweedie_p = 1,
-  median_comparison = FALSE,
-  cores = 1
+  median_comparison = FALSE
 )
 
 head(umi_fit)
@@ -181,11 +182,122 @@ nonumi_fit <- Tweedieverse(
   normalization = "SCRAN",
   fixed_effects = c("condition", "batch"),
   tweedie_p = NULL,
-  median_comparison = FALSE,
-  cores = 1
+  median_comparison = FALSE
 )
 
 head(nonumi_fit)
+```
+
+## Pseudobulk Single-Cell RNA-seq Example
+
+Pseudobulk analysis aggregates single-cell counts to sample-level counts before
+modeling. This is useful when the biological replicate, rather than the cell,
+is the experimental unit. The `muscat` package provides a Bioconductor-native
+workflow for this aggregation. Its `aggregateData()` function summarizes a
+`SingleCellExperiment` by variables in `colData`, commonly
+`cluster_id` and `sample_id`.
+
+This example follows the workflow used by the `muscat` vignette:
+multi-subject single-cell data are first represented as a prepared
+`SingleCellExperiment`, cells are aggregated into cluster-by-sample pseudobulk
+counts, and the resulting sample-level count matrix is analyzed with
+`Tweedieverse()`. The package-provided `example_sce` object contains the
+required `cluster_id`, `sample_id`, and `group_id` fields and is a lightweight
+version of the Kang et al. interferon stimulation example used throughout
+`muscat`.
+
+```{r pseudobulk-fit}
+data("example_sce", package = "muscat")
+
+pseudobulk_input <- example_sce[seq_len(100), ]
+
+pseudobulk_sce <- muscat::aggregateData(
+  pseudobulk_input,
+  assay = "counts",
+  fun = "sum",
+  by = c("cluster_id", "sample_id"),
+  verbose = FALSE
+)
+
+SummarizedExperiment::assayNames(pseudobulk_sce)
+
+pseudobulk_assay <- "CD4 T cells"
+pseudobulk_counts <- SummarizedExperiment::assay(
+  pseudobulk_sce,
+  pseudobulk_assay
+)
+top_pseudobulk_genes <- order(
+  rowSums(pseudobulk_counts),
+  decreasing = TRUE
+)[seq_len(20)]
+
+pseudobulk_metadata <- unique(as.data.frame(
+  SummarizedExperiment::colData(pseudobulk_input)[, c("sample_id", "group_id")]
+))
+rownames(pseudobulk_metadata) <- pseudobulk_metadata$sample_id
+pseudobulk_metadata <- pseudobulk_metadata[
+  colnames(pseudobulk_counts),
+  ,
+  drop = FALSE
+]
+pseudobulk_metadata$condition <- pseudobulk_metadata$group_id
+
+pseudobulk_se <- SummarizedExperiment::SummarizedExperiment(
+  assays = list(counts = pseudobulk_counts[top_pseudobulk_genes, , drop = FALSE]),
+  colData = pseudobulk_metadata
+)
+
+pseudobulk_fit <- Tweedieverse(
+  input_features = pseudobulk_se,
+  output = NULL,
+  assay_name = "counts",
+  domain = "bulk_rnaseq",
+  fixed_effects = c("condition"),
+  tweedie_p = 1,
+  median_comparison = FALSE,
+  max_significance = 1
+)
+
+head(pseudobulk_fit)
+```
+
+## Bulk RNA-seq Count Example
+
+For bulk RNA-seq data, `Tweedieverse()` accepts a `SummarizedExperiment`.
+This example uses the Bioconductor `airway` dataset, which contains RNA-seq
+read counts from airway smooth muscle cells treated with dexamethasone.
+
+The full `airway` object contains tens of thousands of genes. To keep the
+vignette fast, the example keeps a small set of high-count genes while
+preserving the original `airway` sample metadata. Bulk RNA-seq uses `TMM` as
+the default normalization strategy in `Tweedieverse`; this computes
+library-size factors for the model offset without modifying the count assay.
+
+```{r bulk-rnaseq-fit}
+data("airway", package = "airway")
+
+airway_counts <- SummarizedExperiment::assay(airway, "counts")
+top_airway_genes <- order(rowSums(airway_counts), decreasing = TRUE)[seq_len(20)]
+
+bulk_rnaseq_se <- SummarizedExperiment::SummarizedExperiment(
+  assays = list(counts = airway_counts[top_airway_genes, , drop = FALSE]),
+  colData = SummarizedExperiment::colData(airway)
+)
+
+bulk_rnaseq_se
+
+bulk_rnaseq_fit <- Tweedieverse(
+  input_features = bulk_rnaseq_se,
+  output = NULL,
+  assay_name = "counts",
+  domain = "bulk_rnaseq",
+  fixed_effects = c("dex"),
+  tweedie_p = 1,
+  median_comparison = FALSE,
+  max_significance = 1
+)
+
+head(bulk_rnaseq_fit)
 ```
 
 ## Multi-omics Container
@@ -217,8 +329,7 @@ multi_fit <- Tweedieverse(
     harmonizedMetaboliteProfile = NULL
   ),
   median_comparison = FALSE,
-  max_significance = 1,
-  cores = 1
+  max_significance = 1
 )
 
 names(multi_fit)

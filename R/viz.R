@@ -456,7 +456,7 @@ association_plots <-
               na.rm = TRUE
             ) +
             ggplot2::guides(alpha = 'none') +
-            ggplot2::labs("") +
+            ggplot2::labs() +
             ggplot2::xlab(x_label) +
             ggplot2::ylab(y_label) +
             theme_omicsEye() +

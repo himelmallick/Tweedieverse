@@ -145,8 +145,7 @@ test_that("MultiAssayExperiment input returns omics-specific results", {
     normalization = c(microbiome = "NONE", rnaseq = "NONE"),
     tweedie_p = c(microbiome = 1, rnaseq = 1),
     median_comparison = FALSE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_s3_class(fit, "TweedieverseMultiAssayResult")
@@ -197,12 +196,45 @@ test_that("Tweedieverse keeps input data unchanged when normalization is selecte
     normalization = "CPM",
     tweedie_p = 1,
     median_comparison = FALSE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_equal(features, features_before)
   expect_true(nrow(fit) > 0)
+})
+
+test_that("BPPARAM controls BiocParallel execution", {
+  set.seed(123)
+  features <- as.data.frame(matrix(rpois(40, lambda = 5), nrow = 20, ncol = 2))
+  colnames(features) <- paste0("feature", seq_len(ncol(features)))
+  rownames(features) <- paste0("sample", seq_len(nrow(features)))
+  metadata <- data.frame(
+    group = rep(c("A", "B"), each = 10),
+    row.names = rownames(features)
+  )
+
+  fit <- Tweedieverse(
+    input_features = make_test_se(features, metadata),
+    output = NULL,
+    fixed_effects = "group",
+    domain = "bulk_rnaseq",
+    normalization = "NONE",
+    tweedie_p = 1,
+    median_comparison = FALSE,
+    max_significance = 1,
+    BPPARAM = BiocParallel::SerialParam()
+  )
+
+  expect_true(nrow(fit) > 0)
+  expect_error(
+    Tweedieverse(
+      input_features = make_test_se(features, metadata),
+      output = NULL,
+      fixed_effects = "group",
+      BPPARAM = list()
+    ),
+    "BiocParallelParam"
+  )
 })
 
 test_that("vector fixed effects are parsed before metadata validation", {
@@ -223,8 +255,7 @@ test_that("vector fixed effects are parsed before metadata validation", {
     normalization = "NONE",
     tweedie_p = 1,
     median_comparison = FALSE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -293,8 +324,7 @@ test_that("p equals 0 transformation is used for the analysis copy and written t
       Maaslin2_run = FALSE,
       p0_transform = "arc signed sqrt",
       median_comparison = FALSE,
-      max_significance = 1,
-      cores = 1
+      max_significance = 1
     )
   )
 
@@ -323,8 +353,7 @@ test_that("fixed Tweedie p values are supported for fixed-effect GLMs", {
     fixed_effects = "group",
     tweedie_p = 1,
     median_comparison = FALSE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -351,8 +380,7 @@ test_that("undefined Tweedie p values between 0 and 1 are rejected", {
       output = NULL,
       fixed_effects = "group",
       tweedie_p = 0.5,
-      median_comparison = FALSE,
-      cores = 1
+      median_comparison = FALSE
     ),
     "between 0 and 1"
   )
@@ -374,8 +402,7 @@ test_that("NA Tweedie p is treated as unspecified", {
     fixed_effects = "group",
     tweedie_p = NA,
     median_comparison = FALSE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -403,8 +430,7 @@ test_that("unspecified p with negative features resolves to p equals 0", {
       tweedie_p = NULL,
       Maaslin2_run = FALSE,
       median_comparison = FALSE,
-      max_significance = 1,
-      cores = 1
+      max_significance = 1
     ),
     "Setting tweedie_p = 0"
   )
@@ -430,8 +456,7 @@ test_that("negative feature values are rejected for positive Tweedie powers", {
       output = NULL,
       fixed_effects = "group",
       tweedie_p = 1,
-      median_comparison = FALSE,
-      cores = 1
+      median_comparison = FALSE
     ),
     "Negative feature values"
   )
@@ -458,8 +483,7 @@ test_that("negative supplied Tweedie p warns but runs for non-negative data", {
       tweedie_p = -1,
       link = "identity",
       median_comparison = FALSE,
-      max_significance = 1,
-      cores = 1
+      max_significance = 1
     ),
     "Negative Tweedie variance powers"
   )
@@ -487,8 +511,7 @@ test_that("presence-absence model adds individual and CCT results", {
     tweedie_p = 1,
     median_comparison = FALSE,
     run_presence_absence_model = TRUE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(all(c(
@@ -520,8 +543,7 @@ test_that("p equals 0 uses the MaAsLin2 linear-model path", {
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 0,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -548,8 +570,7 @@ test_that("presence-absence model can combine with the MaAsLin2 p equals 0 path"
     fixed_effects = "group",
     tweedie_p = 0,
     run_presence_absence_model = TRUE,
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -585,8 +606,7 @@ test_that("p equals 0 can run through the Tweedie GLM when Maaslin2_run is FALSE
     tweedie_p = 0,
     Maaslin2_run = FALSE,
     link = "identity",
-    max_significance = 1,
-    cores = 1
+    max_significance = 1
   )
 
   expect_true(nrow(fit) > 0)
@@ -618,8 +638,7 @@ test_that("MaAsLin2 method_args are accepted for the p equals 0 path", {
         normalization = "NONE",
         transform = "NONE"
       )
-    ),
-    cores = 1
+    )
   )
 
   expect_true(nrow(fit) > 0)
@@ -650,8 +669,7 @@ test_that("method.args is an alias but cannot be mixed with method_args", {
         normalization = "NONE",
         transform = "NONE"
       )
-    ),
-    cores = 1
+    )
   )
 
   expect_true(nrow(fit) > 0)
@@ -662,8 +680,7 @@ test_that("method.args is an alias but cannot be mixed with method_args", {
       fixed_effects = "group",
       tweedie_p = 0,
       method_args = list(Maaslin2 = list(transform = "NONE")),
-      method.args = list(Maaslin2 = list(transform = "LOG")),
-      cores = 1
+      method.args = list(Maaslin2 = list(transform = "LOG"))
     ),
     "only one of method_args or method.args"
   )

@@ -9,7 +9,7 @@ fit.Tweedieverse <- function(features,
                              random_effects_formula = NULL,
                              adjust_offset = TRUE,
                              correction = 'BH',
-                             cores = 4,
+                             BPPARAM = BiocParallel::SerialParam(),
                              optimizer = 'nlminb',
                              na.action = na.exclude) {
   
@@ -49,7 +49,7 @@ fit.Tweedieverse <- function(features,
     formula = formula,
     random_effects_formula = random_effects_formula,
     correction = correction,
-    cores = cores,
+    BPPARAM = BPPARAM,
     optimizer = optimizer,
     na.action = na.action
   )

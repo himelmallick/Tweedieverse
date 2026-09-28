@@ -7,7 +7,7 @@ fit.CPLM <- function(features,
                      formula = NULL,
                      random_effects_formula = NULL,
                      correction = 'BH',
-                     cores = 4,
+                     BPPARAM = BiocParallel::SerialParam(),
                      optimizer = 'nlminb',
                      na.action = na.exclude) {
 
@@ -25,7 +25,7 @@ fit.CPLM <- function(features,
                               formula,
                               random_effects_formula,
                               correction,
-                              cores,
+                              BPPARAM,
                               method_args = NULL) {
     if (!requireNamespace("Maaslin2", quietly = TRUE)) {
       stop("Maaslin2 is required when tweedie_p = 0.")
@@ -52,6 +52,7 @@ fit.CPLM <- function(features,
     }, add = TRUE)
 
     maaslin2_args <- extract_method_args(method_args, "Maaslin2")
+    BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
     fit <- do.call(
       Maaslin2::Maaslin2,
       merge_method_args(
@@ -71,7 +72,7 @@ fit.CPLM <- function(features,
           max_significance = 1,
           correction = correction,
           standardize = FALSE,
-          cores = cores
+          cores = bpparam_worker_count(BPPARAM)
         ),
         maaslin2_args
       )
@@ -101,7 +102,7 @@ fit.CPLM <- function(features,
       formula = formula,
       random_effects_formula = random_effects_formula,
       correction = correction,
-      cores = cores,
+      BPPARAM = BPPARAM,
       method_args = method_args
     ))
   }
@@ -235,39 +236,14 @@ fit.CPLM <- function(features,
   }
   
   
-  #######################################
-  # Init cluster for parallel computing #
-  #######################################
-  
-  cluster <- NULL
-  if (cores > 1)
-  {
-    logging::loginfo("Creating cluster of %s R processes", cores)
-    cluster <- parallel::makeCluster(cores)
-    clusterExport(
-      cluster,
-      c(
-        "features",
-        "metadata",
-        "formula",
-        "link",
-        "tweedie_p",
-        "tweedie_link_power",
-        "optimizer",
-        "na.action",
-        "model_function",
-        "summary_function"
-      ),
-      envir = environment()
-    )
-  }
+  BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
   
   ##############################
   # Apply per-feature modeling #
   ##############################
   
   outputs <-
-    pbapply::pblapply(seq_len(ncol(features)), cl = cluster, function(x) {
+    BiocParallel::bplapply(seq_len(ncol(features)), function(x) {
       metadata_names <- setdiff(colnames(metadata), "offset")
       
       #################################
@@ -334,14 +310,7 @@ fit.CPLM <- function(features,
           'name')
       output$para$feature <- colnames(features)[x]
       return(output)
-    })
-  
-  ####################
-  # Stop the cluster #
-  ####################
-  
-  if (!is.null(cluster))
-    parallel::stopCluster(cluster)
+    }, BPPARAM = BPPARAM)
   
   #####################################
   # Bind the results for each feature #
