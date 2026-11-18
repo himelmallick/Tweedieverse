@@ -246,7 +246,15 @@ test_that("median comparison and CCT helpers cover edge cases", {
   expect_equal(no_use$coef_median, df$effect_size)
   expect_equal(Tweedieverse:::tweedieverse_cct(c(0, 0.5)), 0)
   expect_equal(Tweedieverse:::tweedieverse_cct(c(1, NA)), 1)
-  expect_error(Tweedieverse:::tweedieverse_cct(c(0, 1)), "exact 0")
+  expect_equal(Tweedieverse:::tweedieverse_cct(c(0.001, NA)), 0.001)
+  expect_identical(Tweedieverse:::tweedieverse_cct(c(NA, NA)), NA_real_)
+  expect_equal(Tweedieverse:::tweedieverse_cct(c(0, 1)), 0)
+  expect_equal(Tweedieverse:::tweedieverse_cct(c(1, 0)), 0)
+  expect_equal(Tweedieverse:::tweedieverse_cct(c(0.001, 1)), 1)
+  expect_equal(
+    Tweedieverse:::tweedieverse_cct(c(0.01, NA, 0.02), weights = c(1, 7, 2)),
+    Tweedieverse:::tweedieverse_cct(c(0.01, 0.02), weights = c(1, 2))
+  )
   expect_error(Tweedieverse:::tweedieverse_cct(c(-0.1, 0.5)), "between 0 and 1")
   expect_error(Tweedieverse:::tweedieverse_cct(c(0.2, 0.3), weights = 1), "same length")
   expect_error(Tweedieverse:::tweedieverse_cct(c(0.2, 0.3), weights = c(1, -1)), "non-negative")
@@ -294,4 +302,20 @@ test_that("presence-absence helper functions augment, fit, and combine results",
 
   expect_true(all(c("pval_presence", "base.model_presence", "pval_abundance") %in% colnames(combined)))
   expect_true(all(combined$base.model == "CCT"))
+
+  presence$pval[presence$feature == "feat1"] <- 1
+  abundance$pval[abundance$feature == "feat1"] <- 0
+  combined <- Tweedieverse:::combine_abundance_presence_results(abundance, presence)
+  expect_equal(combined$pval_presence, c(1, NA_real_))
+  expect_equal(combined$pval, c(0, 0.2))
+  expect_equal(combined$qval, stats::p.adjust(combined$pval, method = "BH"))
+
+  features$feat1 <- c(0, 0, 0, rep(1, 7))
+  metadata$group[1] <- NA
+  default_fit <- Tweedieverse:::fit_presence_absence_model(features, metadata, formula)
+  expect_true(all(is.na(default_fit$pval)))
+  relaxed_fit <- Tweedieverse:::fit_presence_absence_model(
+    features, metadata, formula, min_presence_absence_count = 2L
+  )
+  expect_false(is.na(relaxed_fit$pval[relaxed_fit$feature == "feat1"]))
 })

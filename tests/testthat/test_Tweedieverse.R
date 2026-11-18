@@ -495,8 +495,11 @@ test_that("negative supplied Tweedie p warns but runs for non-negative data", {
 
 test_that("presence-absence model adds individual and CCT results", {
   set.seed(123)
-  features <- as.data.frame(matrix(rpois(80, lambda = 5), nrow = 20, ncol = 4))
-  features[seq_len(10), 1] <- 0
+  features <- as.data.frame(matrix(1L + rpois(80, lambda = 5), nrow = 20, ncol = 4))
+  features[1:3, 1] <- 0
+  features[11:20, 2] <- features[11:20, 2] + 25L
+  features[1:2, 3] <- 0
+  features[3:20, 4] <- 0
   colnames(features) <- paste0("feature", seq_len(ncol(features)))
   rownames(features) <- paste0("sample", seq_len(nrow(features)))
   metadata <- data.frame(
@@ -504,15 +507,18 @@ test_that("presence-absence model adds individual and CCT results", {
     row.names = rownames(features)
   )
 
-  fit <- Tweedieverse(
+  run_fit <- function(...) Tweedieverse(
     input_features = make_test_se(features, metadata),
     output = NULL,
     fixed_effects = "group",
     tweedie_p = 1,
+    prev_threshold = 0,
     median_comparison = FALSE,
     run_presence_absence_model = TRUE,
-    max_significance = 1
+    max_significance = 1,
+    ...
   )
+  fit <- run_fit()
 
   expect_true(all(c(
     "pval_abundance",
@@ -524,6 +530,20 @@ test_that("presence-absence model adds individual and CCT results", {
   ) %in% colnames(fit)))
   expect_true(all(fit$base.model == "CCT"))
   expect_equal(fit$qval, sort(fit$qval))
+  all_present <- fit[fit$feature == "feature2", ]
+  expect_equal(nrow(all_present), 1L)
+  expect_true(is.na(all_present$pval_presence))
+  expect_equal(all_present$pval, all_present$pval_abundance)
+  expect_lt(all_present$qval, 0.05)
+  expect_false(is.na(fit$pval_presence[fit$feature == "feature1"]))
+  rare <- fit[fit$feature %in% c("feature3", "feature4"), ]
+  expect_equal(nrow(rare), 2L)
+  expect_true(all(is.na(rare$pval_presence)))
+  expect_equal(rare$pval, rare$pval_abundance)
+
+  relaxed <- run_fit(min_presence_absence_count = 2L)
+  expect_equal(sum(!is.na(relaxed$pval_presence[relaxed$feature %in% rare$feature])), 2L)
+  expect_error(run_fit(min_presence_absence_count = 1.5), "must be a positive whole number")
 })
 
 test_that("p equals 0 uses the MaAsLin2 linear-model path", {

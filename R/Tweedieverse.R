@@ -79,6 +79,10 @@
 #' alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
 #' Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
 #' of the two p-values. Default is FALSE.
+#' @param min_presence_absence_count Minimum number of detected samples and minimum number of
+#' undetected samples required for the presence-absence fit. Default is 3 for each.
+#' For retained features below either minimum, the presence-absence p-value is missing
+#' and the joint p-value uses the abundance p-value directly.
 #' @param method_args Optional named list of method-specific arguments. For \code{tweedie_p = 0}, use
 #' \code{method_args = list(Maaslin2 = list(...))} to pass arguments to \code{\link[Maaslin2]{Maaslin2}};
 #' user-supplied values override Tweedieverse defaults.
@@ -179,7 +183,8 @@ Tweedieverse <- function(input_features,
                          plot_heatmap = FALSE,
                          plot_scatter = FALSE,
                          heatmap_first_n = 50,
-                         reference = NULL) {
+                         reference = NULL,
+                         min_presence_absence_count = 3L) {
   valid_input_classes <- c(
     "MultiAssayExperiment",
     unique(unlist(domain_bioc_container_map()))
@@ -238,7 +243,8 @@ Tweedieverse <- function(input_features,
       plot_heatmap = plot_heatmap,
       plot_scatter = plot_scatter,
       heatmap_first_n = heatmap_first_n,
-      reference = reference
+      reference = reference,
+      min_presence_absence_count = min_presence_absence_count
     ))
   }
 
@@ -277,7 +283,8 @@ Tweedieverse <- function(input_features,
     plot_heatmap = plot_heatmap,
     plot_scatter = plot_scatter,
     heatmap_first_n = heatmap_first_n,
-    reference = reference
+    reference = reference,
+    min_presence_absence_count = min_presence_absence_count
   )
 }
 
@@ -315,7 +322,8 @@ Tweedieverse <- function(input_features,
                                  plot_heatmap = FALSE,
                                  plot_scatter = FALSE,
                                  heatmap_first_n = 50,
-                                 reference = NULL) {
+                                 reference = NULL,
+                                 min_presence_absence_count = 3L) {
   
   
 
@@ -447,6 +455,7 @@ Tweedieverse <- function(input_features,
   logging::logdebug("Correction method: %s", correction)
   logging::logdebug("Run MaAsLin2 for tweedie_p = 0: %s", Maaslin2_run)
   logging::logdebug("Run presence-absence model: %s", run_presence_absence_model)
+  logging::logdebug("Minimum presence-absence count: %s", min_presence_absence_count)
   logging::logdebug("Method-specific arguments provided: %s",
                     !is.null(method_args) || !is.null(method.args))
   logging::logdebug("Standardize: %s", standardize)
@@ -534,6 +543,14 @@ Tweedieverse <- function(input_features,
       length(run_presence_absence_model) != 1L ||
       is.na(run_presence_absence_model)) {
     stop("run_presence_absence_model must be TRUE or FALSE.")
+  }
+
+  if (!is.numeric(min_presence_absence_count) ||
+      length(min_presence_absence_count) != 1L ||
+      !is.finite(min_presence_absence_count) ||
+      min_presence_absence_count < 1 ||
+      min_presence_absence_count != floor(min_presence_absence_count)) {
+    stop("min_presence_absence_count must be a positive whole number.")
   }
 
   if (!is.logical(Maaslin2_run) ||
@@ -1075,7 +1092,8 @@ Tweedieverse <- function(input_features,
       formula = formula,
       random_effects_formula = random_effects_formula,
       correction = correction,
-      BPPARAM = BPPARAM
+      BPPARAM = BPPARAM,
+      min_presence_absence_count = min_presence_absence_count
     )
     ordered_results <- combine_abundance_presence_results(
       abundance_results = ordered_results,

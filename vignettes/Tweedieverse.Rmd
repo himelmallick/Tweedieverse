@@ -273,6 +273,17 @@ preserving the original `airway` sample metadata. Bulk RNA-seq uses `TMM` as
 the default normalization strategy in `Tweedieverse`; this computes
 library-size factors for the model offset without modifying the count assay.
 
+Set `run_presence_absence_model = TRUE` to include a test for whether the
+feature is detected. By default, the prevalence fit requires at least three
+samples with nonzero counts and three with zero counts for each gene.
+Use `min_presence_absence_count` to change both minimums. In bulk and pseudobulk
+data, genes with only one or two zeros can still enter the abundance analysis.
+For retained genes below either minimum, `pval_presence` is `NA` and
+`pval_abundance` becomes the joint `pval`. When the two
+reported p-values are exactly 0 and 1, the joint `pval` is 0. Tweedieverse
+applies the selected multiple-testing correction to the joint p-values to
+compute `qval`.
+
 ```{r bulk-rnaseq-fit}
 data("airway", package = "airway")
 
@@ -294,6 +305,7 @@ bulk_rnaseq_fit <- Tweedieverse(
   fixed_effects = c("dex"),
   tweedie_p = 1,
   median_comparison = FALSE,
+  run_presence_absence_model = TRUE,
   max_significance = 1
 )
 

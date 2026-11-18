@@ -1,2 +1,10 @@
+Changes in version 0.99.1 (2026-11-18):
+* Add min_presence_absence_count, which defaults to three detected and three
+  undetected samples per feature. Retained features below either minimum skip
+  the prevalence fit.
+* Use the abundance p-value directly when the prevalence p-value is missing.
+  Combine an exact p-value pair of 0 and 1 as 0 in either order.
+* Document these rules in the README and the bulk RNA-seq tutorial.
+
 Changes in version 0.1.0 (2021-03-03):
 * Initial tagged release.

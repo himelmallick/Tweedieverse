@@ -423,7 +423,8 @@ run_multiassay_tweedieverse <- function(input_features,
                                         plot_heatmap = FALSE,
                                         plot_scatter = FALSE,
                                         heatmap_first_n = 50,
-                                        reference = NULL) {
+                                        reference = NULL,
+                                        min_presence_absence_count = 3L) {
   if (!is.null(method_args) && !is.null(method.args)) {
     stop("Please provide only one of method_args or method.args.")
   }
@@ -480,7 +481,10 @@ run_multiassay_tweedieverse <- function(input_features,
       plot_heatmap = resolve_multiomics_arg(plot_heatmap, omics_name, omics_names, "plot_heatmap"),
       plot_scatter = resolve_multiomics_arg(plot_scatter, omics_name, omics_names, "plot_scatter"),
       heatmap_first_n = resolve_multiomics_arg(heatmap_first_n, omics_name, omics_names, "heatmap_first_n"),
-      reference = resolve_multiomics_arg(reference, omics_name, omics_names, "reference")
+      reference = resolve_multiomics_arg(reference, omics_name, omics_names, "reference"),
+      min_presence_absence_count = resolve_multiomics_arg(
+        min_presence_absence_count, omics_name, omics_names, "min_presence_absence_count"
+      )
     )
     fit$omics <- omics_name
     fit <- dplyr::select(fit, dplyr::all_of("omics"), dplyr::everything())
@@ -881,15 +885,28 @@ median_comparison_tweedie <- function(df,
 }
 
 tweedieverse_cct <- function(pvals, weights = NULL) {
-  pvals <- ifelse(is.na(pvals), 1, pvals)
-
+  available <- !is.na(pvals)
+  if (!is.null(weights)) {
+    if (length(weights) != length(pvals)) {
+      stop("weights must have the same length as pvals.")
+    }
+    weights <- weights[available]
+    if (any(weights < 0)) {
+      stop("weights must be non-negative.")
+    }
+  }
+  pvals <- pvals[available]
   if (any(pvals < 0 | pvals > 1)) {
     stop("All p-values must be between 0 and 1.")
   }
 
-  if (any(pvals == 0) && any(pvals == 1)) {
-    stop("Cannot combine exact 0 and exact 1 p-values.")
+  if (length(pvals) == 0L) {
+    return(NA_real_)
   }
+  if (length(pvals) == 1L) {
+    return(pvals[[1L]])
+  }
+  # Give exact zero precedence when both Cauchy endpoints occur.
   if (any(pvals == 0)) {
     return(0)
   }
@@ -899,10 +916,6 @@ tweedieverse_cct <- function(pvals, weights = NULL) {
 
   if (is.null(weights)) {
     weights <- rep(1 / length(pvals), length(pvals))
-  } else if (length(weights) != length(pvals)) {
-    stop("weights must have the same length as pvals.")
-  } else if (any(weights < 0)) {
-    stop("weights must be non-negative.")
   } else {
     weights <- weights / sum(weights)
   }
@@ -1007,7 +1020,8 @@ fit_presence_absence_model <- function(features,
                                        random_effects_formula = NULL,
                                        correction = "BH",
                                        BPPARAM = BiocParallel::SerialParam(),
-                                       na.action = na.exclude) {
+                                       na.action = na.exclude,
+                                       min_presence_absence_count = 3L) {
   if (!is.null(random_effects_formula) &&
       !requireNamespace("glmmTMB", quietly = TRUE)) {
     stop("glmmTMB is required for presence-absence models with random_effects.")
@@ -1027,21 +1041,25 @@ fit_presence_absence_model <- function(features,
     log_offset <- log(metadata$offset)
   }
   metadata_names <- setdiff(colnames(metadata), "offset")
+  model_columns <- intersect(c(all.vars(presence_formula), "offset"), colnames(metadata))
+  complete_metadata <- rowSums(is.na(metadata[, model_columns, drop = FALSE])) == 0L
 
   BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
 
   outputs <- BiocParallel::bplapply(seq_len(ncol(features)), function(x) {
     expr <- as.integer(features[, x] > 0)
-    data_sub <- data.frame(metadata, expr = expr)
+    observed <- expr[complete_metadata]
+    n_present <- sum(observed == 1L, na.rm = TRUE)
+    n_absent <- sum(observed == 0L, na.rm = TRUE)
 
-    if (length(unique(expr)) < 2L) {
+    if (min(n_present, n_absent) < min_presence_absence_count) {
       para <- as.data.frame(matrix(NA_real_, nrow = length(metadata_names), ncol = 5))
       para$name <- metadata_names
     } else {
       fit <- try(
         fit_augmented_presence_model(
           formula = presence_formula,
-          data = data_sub,
+          data = data.frame(metadata, expr = expr),
           has_random_effects = has_random_effects,
           offset = log_offset,
           na.action = na.action

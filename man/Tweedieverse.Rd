@@ -39,7 +39,8 @@ Tweedieverse(
   plot_heatmap = FALSE,
   plot_scatter = FALSE,
   heatmap_first_n = 50,
-  reference = NULL
+  reference = NULL,
+  min_presence_absence_count = 3L
 )
 }
 \arguments{
@@ -144,6 +145,11 @@ When the resolved Tweedie index is \code{0}, non-identity links are changed to \
 alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
 Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
 of the two p-values. Default is FALSE.}
+
+\item{min_presence_absence_count}{Minimum number of detected samples and minimum number of
+undetected samples required for the presence-absence fit. Default is 3 for each.
+For retained features below either minimum, the presence-absence p-value is missing
+and the joint p-value uses the abundance p-value directly.}
 
 \item{method_args}{Optional named list of method-specific arguments. For \code{tweedie_p = 0}, use
 \code{method_args = list(Maaslin2 = list(...))} to pass arguments to \code{\link[Maaslin2]{Maaslin2}};

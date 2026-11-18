@@ -251,6 +251,10 @@ fit <- Tweedieverse(
 
 The presence-absence model tests whether each feature is detected (`feature > 0`) as a function of the metadata. When `run_presence_absence_model = TRUE`, Tweedieverse runs this logistic model alongside the selected abundance model, including the MaAsLin2 abundance path used by default for `tweedie_p = 0`. Tweedieverse keeps the individual abundance-model and presence-absence-model p-values, then combines them with a Cauchy combination test (CCT) to produce a joint ranking.
 
+By default, the presence-absence model requires at least three detected samples and three undetected samples per feature, counting samples with observed abundances and model covariates. Set `min_presence_absence_count` to change both minimums. For example, `min_presence_absence_count = 1` allows a fit when at least one sample is detected and one is undetected. Retained features below either minimum have `pval_presence = NA` and use the abundance p-value directly.
+
+If the two reported p-values are exactly 0 and 1, the combined p-value is 0. The selected multiple-testing correction is applied across the resulting p-values to compute the joint q-values.
+
 The combined output includes columns such as:
 
 - `pval_abundance` and `qval_abundance`
