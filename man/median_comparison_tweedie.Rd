@@ -9,7 +9,8 @@ median_comparison_tweedie(
   p_cutoff = 0.95,
   subtract_median = FALSE,
   n_sims = 10000,
-  median_threshold = 0
+  median_threshold = 0,
+  seed = NULL
 )
 }
 \arguments{
@@ -32,6 +33,10 @@ the covariance between each coefficient and the group median
 \item{median_threshold}{Numeric.  Absolute difference below which a
 coefficient is considered effectively equal to the median and assigned
 `pval_median = 1` (default `0`).}
+
+\item{seed}{Optional non-negative integer seed for the simulations. Default is NULL,
+which uses the current random-number stream. A supplied seed is scoped with withr
+and restores the preceding random-number state when this function exits.}
 }
 \value{
 The input `df` with two new columns:
@@ -78,6 +83,12 @@ toy <- data.frame(
 )
 median_comparison_tweedie(toy, n_sims = 100)
 
+}
+\section{Attribution}{
+The simulation and covariance-adjustment code is adapted from MaAsLin 3
+by William Nickols and Jacob Nearing, distributed under the MIT license.
+Copyright 2025 Harvard School of Public Health.
+The upstream notice is included in the package's COPYRIGHTS file.
 }
 \seealso{
 [MaAsLin 3 GitHub](https://github.com/biobakery/maaslin3)

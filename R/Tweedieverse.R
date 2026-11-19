@@ -33,8 +33,9 @@
 #' @param var_threshold If variance filtering is desired, only features that have variances greater than
 #' \code{var_threshold} are retained. This step is done after the prevalence-abundance filtering.
 #' Default value for \code{var_threshold} is \code{0.0} (i.e. no variance filtering).
-#' @param entropy_threshold If entropy-based filtering is desired for metadata, only features that have entropy greater than
-#' \code{entropy_threshold} are retained. Default value for \code{entropy_threshold} is \code{0.0} (i.e. no entropy filtering).
+#' @param entropy_threshold Metadata columns are retained when their entropy, computed by
+#' \code{tweedie_entropy()}, exceeds this threshold. Default is 0, which removes
+#' metadata columns with zero entropy, including constant columns.
 #' @param base_model The per-feature base model. Only "CPLM" is supported.
 #' @param link A specification of the GLM link function. Default is "log". Must be one of "log", "identity", "sqrt", or "inverse".
 #' @param tweedie_p Numeric Tweedie variance power. Default is \code{NULL}, which estimates the compound-Poisson
@@ -75,6 +76,10 @@
 #' \code{adjust_offset} is disabled.
 #' @param median_comparison If TRUE, coefficients will be tested against a null value corresponding to the median coefficient for a covariate in the \code{metadata}. Default is FALSE. Should only be used for relative abundance data.
 #' @param median_subtraction If TRUE, coefficients minus median will be used for compositionality adjustment. 
+#' @param median_comparison_seed Optional non-negative integer seed for the median-comparison
+#' simulations. Default is NULL, which uses the current random-number stream.
+#' A supplied seed is scoped with withr and restores the preceding random-number state
+#' after the median-comparison calculation.
 #' @param run_presence_absence_model If TRUE, also fit a DAssemble-style presence-absence logistic regression model
 #' alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
 #' Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
@@ -98,6 +103,9 @@
 #' @param plot_scatter Logical. If TRUE (default is FALSE), generate scatter/box plots of individual associations.
 #' @param heatmap_first_n In heatmap, plot top N features with significant associations (default is 50).
 #' @param reference The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).
+#' @param return_all Logical. If TRUE, return the full result table before the
+#' significance threshold is applied, including when output is NULL.
+#' Default is FALSE, which returns associations passing max_significance.
 #'
 #' @importFrom grDevices colorRampPalette dev.off jpeg pdf
 #' @importFrom stats coef fitted as.formula na.exclude offset p.adjust plogis relevel sd update
@@ -108,6 +116,8 @@
 #' @return For single-omics input, a data frame containing coefficient estimates, p-values,
 #' and q-values (multiplicity-adjusted p-values) is returned. For \code{MultiAssayExperiment}
 #' input, a named list of omics-specific result data frames is returned.
+#' With \code{return_all = TRUE}, each table contains the results before
+#' filtering by \code{max_significance}.
 #'
 #' @author Himel Mallick, \email{him4004@@med.cornell.edu}
 #'
@@ -184,7 +194,9 @@ Tweedieverse <- function(input_features,
                          plot_scatter = FALSE,
                          heatmap_first_n = 50,
                          reference = NULL,
-                         min_presence_absence_count = 3L) {
+                         min_presence_absence_count = 3L,
+                         return_all = FALSE,
+                         median_comparison_seed = NULL) {
   valid_input_classes <- c(
     "MultiAssayExperiment",
     unique(unlist(domain_bioc_container_map()))
@@ -244,7 +256,9 @@ Tweedieverse <- function(input_features,
       plot_scatter = plot_scatter,
       heatmap_first_n = heatmap_first_n,
       reference = reference,
-      min_presence_absence_count = min_presence_absence_count
+      min_presence_absence_count = min_presence_absence_count,
+      return_all = return_all,
+      median_comparison_seed = median_comparison_seed
     ))
   }
 
@@ -284,7 +298,9 @@ Tweedieverse <- function(input_features,
     plot_scatter = plot_scatter,
     heatmap_first_n = heatmap_first_n,
     reference = reference,
-    min_presence_absence_count = min_presence_absence_count
+    min_presence_absence_count = min_presence_absence_count,
+    return_all = return_all,
+    median_comparison_seed = median_comparison_seed
   )
 }
 
@@ -323,7 +339,9 @@ Tweedieverse <- function(input_features,
                                  plot_scatter = FALSE,
                                  heatmap_first_n = 50,
                                  reference = NULL,
-                                 min_presence_absence_count = 3L) {
+                                 min_presence_absence_count = 3L,
+                                 return_all = FALSE,
+                                 median_comparison_seed = NULL) {
   
   
 
@@ -351,13 +369,7 @@ Tweedieverse <- function(input_features,
   # Support multiple Bioconductor classes #
   #########################################
 
-  domain <- tolower(domain)
-  if (!domain %in% domain_choices) {
-    option_not_valid_error(
-      "Please select a domain from the list of available options",
-      toString(domain_choices)
-    )
-  }
+  domain <- match.arg(tolower(domain), domain_choices)
 
   valid_classes <- unique(unlist(domain_bioc_container_map()))
   
@@ -396,7 +408,6 @@ Tweedieverse <- function(input_features,
       stop(sprintf("Unable to create output folder: %s", output))
     }
     
-    #if (plot_heatmap || plot_scatter) {
     figures_folder <- file.path(output, "figures")
     if (!dir.exists(figures_folder)) {
       message(sprintf("Creating output figures folder: %s", figures_folder))
@@ -405,7 +416,6 @@ Tweedieverse <- function(input_features,
     if (!dir.exists(figures_folder)) {
       stop(sprintf("Unable to create output figures folder: %s", figures_folder))
     }
-    #}
     
     # Create log file (write info to stdout and debug level to log file)
     # Set level to finest so all log levels are reviewed
@@ -415,6 +425,13 @@ Tweedieverse <- function(input_features,
       warning(sprintf("Deleting existing log file: %s", log_file), call. = FALSE)
       unlink(log_file)
     }
+    logger <- logging::getLogger()
+    previous_handlers <- logger$handlers
+    previous_level <- logger$level
+    on.exit({
+      logger$handlers <- previous_handlers
+      logger$level <- previous_level
+    }, add = TRUE)
     logging::basicConfig(level = 'FINEST')
     logging::addHandler(logging::writeToFile,
                         file = log_file, level = "DEBUG")
@@ -430,12 +447,6 @@ Tweedieverse <- function(input_features,
   
   logging::loginfo("Writing function arguments to log file")
   logging::logdebug("Function arguments")
-  if (is.character(input_features)) {
-    logging::logdebug("Input data file: %s", input_features)
-  }
-  if (is.character(input_metadata)) {
-    logging::logdebug("Input metadata file: %s", input_metadata)
-  }
   logging::logdebug("Output folder: %s", output)
   logging::logdebug("Abundance threshold: %f", abd_threshold)
   logging::logdebug("Prevalence threshold: %f", prev_threshold)
@@ -467,19 +478,8 @@ Tweedieverse <- function(input_features,
   # Check if valid options are selected #
   #######################################
   
-  # Check if the selected link is valid
-  if (!link %in% link_choices) {
-    option_not_valid_error("Please select a link from the list of available options",
-                           toString(link_choices))
-  }
-  
-  # Check if the selected base_model is valid
-  if (!base_model %in% model_choices) {
-    option_not_valid_error(
-      "Please select an analysis method from the list of available options",
-      toString(model_choices)
-    )
-  }
+  link <- match.arg(link, link_choices)
+  base_model <- match.arg(base_model, model_choices)
 
   p0_transform <- gsub("[ -]", "_", toupper(p0_transform))
   if (p0_transform %in% c("ARCSIGNEDSQRT", "ARC_SIGNED_SQUARE_ROOT", "SIGNED_SQRT")) {
@@ -504,21 +504,8 @@ Tweedieverse <- function(input_features,
     scale_factor = scale_factor
   )
   
-  # Check if the selected correction is valid
-  if (!correction %in% correction_choices) {
-    option_not_valid_error(
-      "Please select a correction method from the list of available options",
-      toString(correction_choices)
-    )
-  }
-  
-  # Check if the selected optimizer is valid
-  if (!optimizer %in% optimizer_choices) {
-    option_not_valid_error(
-      "Please select an optimizer method from the list of available options",
-      toString(correction_choices)
-    )
-  }
+  correction <- match.arg(correction, correction_choices)
+  optimizer <- match.arg(optimizer, optimizer_choices)
 
   if (!is.null(tweedie_p)) {
     if (length(tweedie_p) != 1L) {
@@ -543,6 +530,10 @@ Tweedieverse <- function(input_features,
       length(run_presence_absence_model) != 1L ||
       is.na(run_presence_absence_model)) {
     stop("run_presence_absence_model must be TRUE or FALSE.")
+  }
+
+  if (!is.logical(return_all) || length(return_all) != 1L || is.na(return_all)) {
+    stop("return_all must be TRUE or FALSE.")
   }
 
   if (!is.numeric(min_presence_absence_count) ||
@@ -587,65 +578,20 @@ Tweedieverse <- function(input_features,
   }
   
   ###############################################################
-  # Determine orientation of data in input and reorder to match #
+  # Align assay columns with sample rows in the metadata       #
   ###############################################################
   
-  logging::loginfo("Determining format of input files")
-  samples_row_row <- intersect(rownames(data), rownames(metadata))
-  if (length(samples_row_row) > 0) {
-    # this is the expected formatting so do not modify data frames
-    logging::loginfo(
-      "Input format is data samples as rows and metadata samples as rows"
-    )
-  } else {
-    samples_column_row <- intersect(colnames(data), rownames(metadata))
-    if (length(samples_column_row) > 0) {
-      logging::loginfo(
-        "Input format is data samples as columns and metadata samples as rows"
-      )
-      # transpose data frame so samples are rows
-      data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
-      logging::logdebug("linked data so samples are rows")
-    } else {
-      samples_column_column <-
-        intersect(colnames(data), colnames(metadata))
-      if (length(samples_column_column) > 0) {
-          logging::loginfo(
-            "Input format is data samples as columns and metadata samples as columns"
-          )
-        data <- utils::type.convert(as.data.frame(t(data)), as.is = TRUE)
-        metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
-        logging::logdebug("linked data and metadata so samples are rows")
-      } else {
-        samples_row_column <-
-          intersect(rownames(data), colnames(metadata))
-        if (length(samples_row_column) > 0) {
-          logging::loginfo(
-            "Input format is data samples as rows and metadata samples as columns"
-          )
-          metadata <- utils::type.convert(as.data.frame(t(metadata)), as.is = TRUE)
-          logging::logdebug("linked metadata so samples are rows")
-        } else {
-          logging::logerror(
-            "Unable to find samples in data and metadata files. Rows/columns do not match."
-          )
-          logging::logdebug("input_features rows: %s",
-                            paste(rownames(data), collapse = ","))
-          logging::logdebug("input_features columns: %s",
-                            paste(colnames(data), collapse = ","))
-          logging::logdebug("Metadata rows: %s",
-                            paste(rownames(metadata), collapse = ","))
-          logging::logdebug("Metadata columns: %s",
-                            paste(colnames(data), collapse = ","))
-          stop()
-        }
-      }
-    }
+  logging::loginfo("Aligning assay columns with metadata rows")
+  data <- Matrix::t(data)
+  if (is.null(colnames(data))) {
+    colnames(data) <- as.character(seq_len(ncol(data)))
   }
-  
-  # Replace unexpected characters in feature names
-  # colnames(data) <- make.names(colnames(data))
-  
+  metadata <- as.data.frame(metadata)
+  if (is.null(rownames(data)) || is.null(rownames(metadata)) ||
+      !any(rownames(data) %in% rownames(metadata))) {
+    stop("Assay column names must match sample row names in colData or input_metadata.")
+  }
+
   # Check for samples without metadata
   extra_feature_samples <-
     setdiff(rownames(data), rownames(metadata))
@@ -754,7 +700,7 @@ Tweedieverse <- function(input_features,
   data_zeros[is.na(data_zeros)] <- 0
   filtered_data <-
     unfiltered_data[,
-                    colSums(data_zeros > abd_threshold) > min_samples,
+                    Matrix::colSums(data_zeros > abd_threshold) > min_samples,
                     drop = FALSE]
   total_filtered_features <-
     ncol(unfiltered_data) - ncol(filtered_data)
@@ -763,7 +709,7 @@ Tweedieverse <- function(input_features,
     total_filtered_features
   )
   filtered_feature_names <-
-    setdiff(names(unfiltered_data), names(filtered_data))
+    setdiff(colnames(unfiltered_data), colnames(filtered_data))
   logging::loginfo("Filtered feature names: %s",
                    toString(filtered_feature_names))
   
@@ -773,7 +719,9 @@ Tweedieverse <- function(input_features,
   # Filter data based on variance #
   #################################
   
-  sds <- apply(filtered_data, 2, na.rm = TRUE, sd)
+  sds <- vapply(seq_len(ncol(filtered_data)), function(i) {
+    stats::sd(as.numeric(filtered_data[, i]), na.rm = TRUE)
+  }, numeric(1))
   final_features <-
     filtered_data[, which(sds > var_threshold), drop = FALSE]
   total_filtered_features_var <-
@@ -781,7 +729,7 @@ Tweedieverse <- function(input_features,
   logging::loginfo("Total filtered features with variance filtering: %d",
                    total_filtered_features_var)
   filtered_feature_names_var <-
-    setdiff(names(filtered_data), names(final_features))
+    setdiff(colnames(filtered_data), colnames(final_features))
   logging::loginfo("Filtered feature names: %s",
                    toString(filtered_feature_names_var))
 
@@ -789,7 +737,7 @@ Tweedieverse <- function(input_features,
   # Resolve Tweedie index after filtering the feature matrix #
   ############################################################
 
-  has_negative_data <- any(as.matrix(final_features) < 0, na.rm = TRUE)
+  has_negative_data <- any(final_features < 0, na.rm = TRUE)
   if (is.null(tweedie_p) && has_negative_data) {
     message(
       "Negative feature values detected after filtering; ",
@@ -848,7 +796,9 @@ Tweedieverse <- function(input_features,
   }
 
   if (!is.null(scale_factor) && scale_factor %in% colnames(unfiltered_metadata)) {
-    unfiltered_metadata <- dplyr::select(unfiltered_metadata, -scale_factor)
+    unfiltered_metadata <- dplyr::select(
+      unfiltered_metadata, -dplyr::all_of(scale_factor)
+    )
   }
   
   
@@ -857,7 +807,7 @@ Tweedieverse <- function(input_features,
   ####################################
   
   # Reduce metadata to only include those pass entropy threshold
-  temp_filtered_metadata <- unfiltered_metadata[, apply(unfiltered_metadata, 2, entropy) > entropy_threshold, drop = FALSE]
+  temp_filtered_metadata <- unfiltered_metadata[, apply(unfiltered_metadata, 2, tweedie_entropy) > entropy_threshold, drop = FALSE]
   excluded_metadata <- setdiff(colnames(unfiltered_metadata), colnames(temp_filtered_metadata))
   logging::loginfo(
     "Excluded metadata with entropy less or equal to %s: %s",
@@ -889,7 +839,7 @@ Tweedieverse <- function(input_features,
     fixed_effects <- setdiff(fixed_effects, to_remove)
     if (length(fixed_effects) == 0) {
       logging::logerror("No fixed effects included in formula.")
-      stop()
+      stop("No fixed effects remain after matching the requested effects to metadata.")
     }
   }
   
@@ -1031,29 +981,16 @@ Tweedieverse <- function(input_features,
   ###################################################
   
   logging::loginfo("Counting prevalence for each feature")
-  try(fit_data$results$N <-
-        apply(
-          fit_data$results,
-          1,
-          FUN = function(x)
-            length(final_features[, x[1]])
-        ))
-  try(fit_data$results$N.not.zero <-
-        apply(
-          fit_data$results,
-          1,
-          FUN = function(x)
-            length(which(final_features[, x[1]] > 0))
-        ))
-  try(fit_data$results$percent.zero <-
-        apply(
-          fit_data$results,
-          1,
-          FUN = function(x)
-            round(mean(final_features[, x[1]] == 0, na.rm = TRUE), 2) *
-            100
-        ))
-  
+  detected <- Matrix::colSums(final_features > 0, na.rm = TRUE)
+  observed <- nrow(final_features) - Matrix::colSums(is.na(final_features))
+  zeros <- observed - Matrix::colSums(final_features != 0, na.rm = TRUE)
+  feature_index <- match(fit_data$results$feature, colnames(final_features))
+  fit_data$results$N <- rep.int(nrow(final_features), nrow(fit_data$results))
+  fit_data$results$N.not.zero <- unname(detected[feature_index])
+  fit_data$results$percent.zero <- unname(
+    round(zeros / observed, 2)[feature_index] * 100
+  )
+
   #########################
   # Write out the results #
   #########################
@@ -1073,7 +1010,8 @@ Tweedieverse <- function(input_features,
                                         p_cutoff = 0.95,  # ignore p>=0.95
                                         subtract_median = median_subtraction,
                                         n_sims = 10000,
-                                        median_threshold = 0)
+                                        median_threshold = 0,
+                                        seed = median_comparison_seed)
     
     ## Replace the classical columns with median-based ones
     ordered_results$coef <- mc_out$coef_median
@@ -1136,7 +1074,7 @@ Tweedieverse <- function(input_features,
   # Write results passing threshold to file
   # (removing any that are NA for the q-value)
   significant_results <-
-    ordered_results[ordered_results$qval <= max_significance,]
+    ordered_results[which(ordered_results$qval <= max_significance), , drop = FALSE]
   
   if (!no_output) {
   significant_results_file <-
@@ -1167,7 +1105,6 @@ Tweedieverse <- function(input_features,
   }, error = function(err) {
     logging::logerror("Unable to do make a Tweedie inxed plot of results!!!")
     logging::logerror(err)
-    # dev.off()
   })
   
   if (plot_heatmap &&
@@ -1184,7 +1121,6 @@ Tweedieverse <- function(input_features,
     }, error = function(err) {
       logging::logerror("Unable to do make a hetamp of results!!!")
       logging::logerror(err)
-      # dev.off()
     })
   }
   
@@ -1193,14 +1129,23 @@ Tweedieverse <- function(input_features,
       "Writing association plots (one for each significant association) to output folder: %s",
       output
     )
+    plot_features <- as.data.frame(as.matrix(
+      final_features[, unique(significant_results$feature), drop = FALSE]
+    ))
+    if (!is.null(offset)) {
+      plot_features <- plot_features / offset
+    }
     association_plots(
       metadata,
-      final_features/offset,
+      plot_features,
       significant_results_file,
       output,
       figures_folder
     )
   }
+  }
+  if (return_all) {
+    return(ordered_results)
   }
   return(significant_results)
 }

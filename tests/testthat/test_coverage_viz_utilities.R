@@ -94,17 +94,13 @@ test_that("association and Tweedie-index plots write expected artifacts", {
     tweedie.index = c(1.2, 1.6)
   )
 
-  features_file <- file.path(out_dir, "features.tsv")
-  metadata_file <- file.path(out_dir, "metadata.tsv")
   output_file <- file.path(out_dir, "output.tsv")
-  utils::write.table(features, features_file, sep = "\t", quote = FALSE)
-  utils::write.table(metadata, metadata_file, sep = "\t", quote = FALSE)
   utils::write.table(output, output_file, sep = "\t", quote = FALSE, row.names = FALSE)
 
   suppressWarnings(
     Tweedieverse:::association_plots(
-      metadata = metadata_file,
-      features = features_file,
+      metadata = metadata,
+      features = features,
       output_results = output_file,
       write_to = out_dir,
       figures_folder = fig_dir,
@@ -152,15 +148,7 @@ test_that("plot helpers handle empty inputs and direct drawing branches", {
   )
 })
 
-test_that("information-gain and method-argument helpers cover numeric and discrete branches", {
-  df <- data.frame(
-    feature_num = c(1, 2, 3, 4, NA, 6),
-    feature_group = c("low", "low", "high", "high", "low", "high"),
-    target = c("A", "A", "B", "B", "A", "B")
-  )
-
-  expect_gt(Tweedieverse:::IG_numeric(df, "feature_num", "target", bins = 2), 0)
-  expect_gt(Tweedieverse:::IG_discrete(df, "feature_group", "target"), 0)
+test_that("method-argument helpers validate and merge overrides", {
   expect_equal(Tweedieverse:::merge_method_args(list(a = 1), list(b = 2)), list(a = 1, b = 2))
   expect_error(Tweedieverse:::merge_method_args(list(a = 1), "bad"), "list")
   expect_equal(Tweedieverse:::extract_method_args(list(Maaslin2 = list(a = 1)), "Maaslin2"), list(a = 1))
@@ -182,9 +170,10 @@ test_that("assay and MultiAssay helpers cover success and failure branches", {
     colData = metadata
   )
 
-  expect_message(assay_df <- Tweedieverse:::extractAssay(se, "counts"), "extracted")
-  expect_equal(dim(assay_df), c(3, 4))
-  expect_message(expect_null(Tweedieverse:::extractAssay(se, "missing")), "not found")
+  expect_message(assay_matrix <- Tweedieverse:::extractAssay(se, "counts"), "extracted")
+  expect_equal(dim(assay_matrix), c(3, 4))
+  expect_identical(assay_matrix, counts)
+  expect_error(Tweedieverse:::extractAssay(se, "missing"), "Available assays: counts")
   expect_true(Tweedieverse:::is_multiassay_experiment(
     MultiAssayExperiment::MultiAssayExperiment(experiments = list(rna = se), colData = metadata)
   ))
@@ -192,10 +181,7 @@ test_that("assay and MultiAssay helpers cover success and failure branches", {
   expect_identical(Tweedieverse:::coerce_multiassay_experiment_input(se), se)
   expect_error(Tweedieverse:::coerce_multiassay_experiment_input(list()), "not supported")
 
-  metadata_file <- tempfile(fileext = ".tsv")
-  utils::write.table(metadata, metadata_file, sep = "\t", quote = FALSE)
   expect_equal(Tweedieverse:::extract_multiassay_metadata(se, metadata), metadata)
-  expect_equal(Tweedieverse:::extract_multiassay_metadata(se, metadata_file), metadata)
 })
 
 test_that("size-factor helpers cover additional normalization and validation branches", {

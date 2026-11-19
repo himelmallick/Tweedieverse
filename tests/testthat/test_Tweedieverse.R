@@ -1,17 +1,19 @@
-# Generate a matrix with feature and group data (from SDA package)
-featureInfo <- matrix(runif(800, -2, 5), ncol = 40)
-featureInfo[featureInfo<0] <- 0
-feat.names <- paste("feature", 1:20, sep = '')
-rownames(featureInfo) <- feat.names
-sub.names <- paste('subject', 1:40, sep = '')
-colnames(featureInfo) <- sub.names
-groupInfo <- data.frame(grouping=matrix(sample(0:1, 40, replace = TRUE),
-                                        ncol = 1))
-rownames(groupInfo) <- colnames(featureInfo)
-
-SEdata <- list(feature = featureInfo, group = groupInfo)
-
-expect_error(Tweedieverse(SEdata))
+test_that("Tweedieverse rejects the legacy feature and metadata list input", {
+  withr::local_seed(123)
+  features <- matrix(stats::runif(800, -2, 5), ncol = 40)
+  features[features < 0] <- 0
+  rownames(features) <- paste0("feature", seq_len(nrow(features)))
+  colnames(features) <- paste0("subject", seq_len(ncol(features)))
+  metadata <- data.frame(
+    grouping = sample(0:1, ncol(features), replace = TRUE),
+    row.names = colnames(features)
+  )
+  expect_error(
+    Tweedieverse(list(feature = features, group = metadata)),
+    "input_features must be a supported Bioconductor container",
+    fixed = TRUE
+  )
+})
 
 make_test_se <- function(features, metadata) {
   SummarizedExperiment::SummarizedExperiment(
@@ -107,52 +109,79 @@ test_that("per-omics arguments resolve by experiment name", {
   ), c("age", "group"))
 })
 
-test_that("MultiAssayExperiment input returns omics-specific results", {
+test_that("MultiAssayExperiment recovers simulated effects and applies offsets", {
   skip_if_not_installed("MultiAssayExperiment")
-
-  set.seed(123)
-  samples <- paste0("sample", seq_len(20))
+  withr::local_seed(123)
+  withr::local_options(lifecycle_verbosity = "quiet")
+  samples <- paste0("sample", seq_len(80))
+  group_b <- rep(c(FALSE, TRUE), each = 40)
   metadata <- data.frame(
-    group = rep(c("A", "B"), each = 10),
+    group = ifelse(group_b, "B", "A"),
+    micro_size = ifelse(group_b, 2, 1),
+    rna_size = ifelse(group_b, 3, 1),
     row.names = samples
   )
-
-  microbiome_counts <- matrix(rpois(60, lambda = 5) + 1, nrow = 3, ncol = 20)
-  rnaseq_counts <- matrix(rpois(80, lambda = 8) + 1, nrow = 4, ncol = 20)
-  rownames(microbiome_counts) <- paste0("taxon", seq_len(nrow(microbiome_counts)))
-  rownames(rnaseq_counts) <- paste0("gene", seq_len(nrow(rnaseq_counts)))
-  colnames(microbiome_counts) <- samples
-  colnames(rnaseq_counts) <- samples
-
-  microbiome <- SummarizedExperiment::SummarizedExperiment(
-    assays = list(counts = microbiome_counts),
-    colData = metadata
+  micro_effects <- c(taxon1 = log(2), taxon2 = -log(2), taxon3 = 0)
+  rna_effects <- c(gene1 = log(1.5), gene2 = -log(1.5), gene3 = 0, gene4 = log(3))
+  micro_means <- 100 * exp(outer(micro_effects, as.numeric(group_b)))
+  rna_means <- 100 * exp(outer(rna_effects, as.numeric(group_b)))
+  micro_means <- sweep(micro_means, 2, metadata$micro_size, "*")
+  rna_means <- sweep(rna_means, 2, metadata$rna_size, "*")
+  microbiome_counts <- matrix(
+    stats::rpois(length(micro_means), lambda = micro_means), nrow = 3,
+    dimnames = list(names(micro_effects), samples)
   )
-  rnaseq <- SummarizedExperiment::SummarizedExperiment(
-    assays = list(counts = rnaseq_counts),
-    colData = metadata
+  rnaseq_counts <- matrix(
+    stats::rpois(length(rna_means), lambda = rna_means), nrow = 4,
+    dimnames = list(names(rna_effects), samples)
   )
   mae <- MultiAssayExperiment::MultiAssayExperiment(
-    experiments = list(microbiome = microbiome, rnaseq = rnaseq),
+    experiments = list(
+      microbiome = SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = microbiome_counts), colData = metadata
+      ),
+      rnaseq = SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = rnaseq_counts), colData = metadata
+      )
+    ),
     colData = metadata
   )
-
-  fit <- Tweedieverse(
+  run_fit <- function(adjust_offset) Tweedieverse(
     input_features = mae,
     output = NULL,
     fixed_effects = "group",
     domain = c(microbiome = "microbiome", rnaseq = "bulk_rnaseq"),
-    normalization = c(microbiome = "NONE", rnaseq = "NONE"),
-    tweedie_p = c(microbiome = 1, rnaseq = 1),
+    normalization = "NONE",
+    scale_factor = c(microbiome = "micro_size", rnaseq = "rna_size"),
+    tweedie_p = 1,
+    adjust_offset = adjust_offset,
+    standardize = FALSE,
     median_comparison = FALSE,
-    max_significance = 1
+    return_all = TRUE
   )
-
+  fit <- run_fit(TRUE)
+  unadjusted <- run_fit(FALSE)
   expect_s3_class(fit, "TweedieverseMultiAssayResult")
   expect_equal(names(fit), c("microbiome", "rnaseq"))
-  expect_true(all(vapply(fit, nrow, integer(1)) > 0))
-  expect_true(all(fit$microbiome$omics == "microbiome"))
-  expect_true(all(fit$rnaseq$omics == "rnaseq"))
+  expected_effects <- list(microbiome = micro_effects, rnaseq = rna_effects)
+  expected_depth_effects <- c(microbiome = log(2), rnaseq = log(3))
+  for (omics in names(expected_effects)) {
+    results <- fit[[omics]]
+    effects <- expected_effects[[omics]]
+    coefficients <- results$coef[match(names(effects), results$feature)]
+    raw_coefficients <- unadjusted[[omics]]$coef[
+      match(names(effects), unadjusted[[omics]]$feature)
+    ]
+    expect_equal(nrow(results), length(effects))
+    expect_true(all(results$omics == omics))
+    expect_true(all(results$metadata == "group" & results$value == "B"))
+    expect_lt(max(abs(coefficients - effects)), 0.08)
+    expect_equal(
+      raw_coefficients - coefficients,
+      rep(unname(expected_depth_effects[omics]), length(effects)),
+      tolerance = 1e-6
+    )
+  }
 })
 
 test_that("scale_factor overrides domain normalization for offsets", {

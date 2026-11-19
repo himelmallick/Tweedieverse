@@ -60,15 +60,15 @@ test_that("Tweedieverse validates high-level options before fitting", {
 
   expect_error(
     Tweedieverse(se, output = NULL, domain = "proteomics"),
-    "Option not valid"
+    "microbiome.*single_cell.*bulk_rnaseq.*custom"
   )
   expect_error(
     Tweedieverse(se, output = NULL, link = "cloglog"),
-    "Option not valid"
+    "log.*identity.*sqrt.*inverse"
   )
   expect_error(
     Tweedieverse(se, output = NULL, base_model = "lm"),
-    "Option not valid"
+    "CPLM"
   )
   expect_error(
     Tweedieverse(se, output = NULL, p0_transform = "sqrt"),
@@ -80,11 +80,11 @@ test_that("Tweedieverse validates high-level options before fitting", {
   )
   expect_error(
     Tweedieverse(se, output = NULL, correction = "fdr"),
-    "Option not valid"
+    "BH.*holm.*hochberg.*hommel.*bonferroni.*BY"
   )
   expect_error(
     Tweedieverse(se, output = NULL, optimizer = "optim"),
-    "Option not valid"
+    "nlminb.*bobyqa.*L-BFGS-B"
   )
   expect_error(
     Tweedieverse(se, output = NULL, tweedie_p = c(1, 2)),
@@ -112,44 +112,26 @@ test_that("Tweedieverse validates high-level options before fitting", {
   )
 })
 
-test_that("Tweedieverse handles all supported feature and metadata orientations", {
+test_that("Tweedieverse requires samples in assay columns and metadata rows", {
   features <- make_core_features(n = 16, p = 2)
   metadata <- make_core_metadata(rownames(features))
 
-  row_row_fit <- Tweedieverse(
-    input_features = make_row_oriented_se(features),
-    input_metadata = metadata,
-    output = NULL,
-    fixed_effects = c("group"),
-    domain = "custom",
-    normalization = "NONE",
-    tweedie_p = 1,
-    max_significance = 1
+  expect_error(
+    Tweedieverse(
+      input_features = make_row_oriented_se(features),
+      input_metadata = metadata,
+      fixed_effects = "group"
+    ),
+    "Assay column names must match sample row names"
   )
-  column_column_fit <- Tweedieverse(
-    input_features = make_core_se(features, metadata),
-    input_metadata = as.data.frame(t(metadata)),
-    output = NULL,
-    fixed_effects = c("group"),
-    domain = "custom",
-    normalization = "NONE",
-    tweedie_p = 1,
-    max_significance = 1
+  expect_error(
+    Tweedieverse(
+      input_features = make_core_se(features, metadata),
+      input_metadata = as.data.frame(t(metadata)),
+      fixed_effects = "group"
+    ),
+    "Assay column names must match sample row names"
   )
-  row_column_fit <- Tweedieverse(
-    input_features = make_row_oriented_se(features),
-    input_metadata = as.data.frame(t(metadata)),
-    output = NULL,
-    fixed_effects = c("group"),
-    domain = "custom",
-    normalization = "NONE",
-    tweedie_p = 1,
-    max_significance = 1
-  )
-
-  expect_true(nrow(row_row_fit) > 0)
-  expect_true(nrow(column_column_fit) > 0)
-  expect_true(nrow(row_column_fit) > 0)
 })
 
 test_that("Tweedieverse handles output setup, references, and optional plots", {

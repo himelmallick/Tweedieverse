@@ -57,7 +57,11 @@ get_AICtab<-function(fit){
 
 
 
-# Adapted form: https://rstudio-pubs-static.s3.amazonaws.com/455435_30729e265f7a4d049400d03a18e218db.html
+# Historical note: the previous entropy and information-gain implementation
+# was adapted from Philippe Jette (2019), "Entropy, Information Gain, and
+# Data Exploration in R":
+# https://rstudio-pubs-static.s3.amazonaws.com/455435_30729e265f7a4d049400d03a18e218db.html
+# The entropy function below is a new implementation of Shannon's formula.
 
 #' Entropy of a Vector
 #'
@@ -65,98 +69,21 @@ get_AICtab<-function(fit){
 #'
 #' @param target A vector of values.
 #' @return A numeric entropy value.
+#' @details Missing values are excluded from category counts but included in the
+#' denominator to preserve the package's metadata-filtering convention.
+#' Empty and entirely missing vectors return zero.
+#' @references Shannon CE (1948). A Mathematical Theory of Communication.
+#' Bell System Technical Journal, 27, 379-423.
+#' \doi{10.1002/j.1538-7305.1948.tb01338.x}.
 #' @examples
-#' entropy(c("A", "A", "B", "B", "C"))
+#' tweedie_entropy(c("A", "A", "B", "B", "C"))
 #' @export
-entropy <- function(target) {
-  #if(all(is.na(target)))  0 
-  freq <- table(target)/length(target)
-  # vectorize
-  vec <- as.data.frame(freq)[,2]
-  #drop 0 to avoid NaN resulting from log2
-  vec<-vec[vec>0]
-  #compute entropy
-  -sum(vec * log2(vec))
-}
-
-IG_numeric<-function(data, feature, target, bins=4) {
-  #Strip out rows where feature is NA
-  data<-data[!is.na(data[,feature]),]
-  #compute entropy for the parent
-  e0<-entropy(data[,target])
-  
-  data$bin<-cut(data[,feature], breaks = bins, labels = seq_len(bins))
-  
-  # compute entropy for each bin without relying on dplyr NSE
-  grouped <- split(data, data$bin)
-  dd_data <- data.frame(
-    e = vapply(grouped, function(x) entropy(x[[target]]), numeric(1)),
-    n = vapply(grouped, nrow, integer(1)),
-    min = vapply(grouped, function(x) min(x[[feature]]), numeric(1)),
-    max = vapply(grouped, function(x) max(x[[feature]]), numeric(1))
-  )
-  
-  #calculate p for each value of feature
-  dd_data$p<-dd_data$n/nrow(data)
-  #compute IG
-  IG<-e0-sum(dd_data$p*dd_data$e)
-  
-  return(IG)
-}
-
-
-
-# returns IG for factor variables.
-IG_discrete<-function(data,feature,target){
-  #Strip out rows where feature is NA
-  data<-data[!is.na(data[,feature]),] 
-  # compute entropy for each level without relying on dplyr NSE
-  grouped <- split(data, data[[feature]])
-  dd_data <- data.frame(
-    e = vapply(grouped, function(x) entropy(x[[target]]), numeric(1)),
-    n = vapply(grouped, nrow, integer(1))
-  )
-  
-  #compute entropy for the parent
-  e0<-entropy(data[,target])
-  #calculate p for each value of feature
-  dd_data$p<-dd_data$n/nrow(data)
-  #compute IG
-  IG<-e0-sum(dd_data$p*dd_data$e)
-  
-  return(IG)
-}
-
-# entropy (c("A", "A", "A", "A", "A", "B", "B"))
-# 0.8631206
-
-#entropy (c("A", "A", "A", "A"))
-# 0
-
-#entropy (c("A", "A", "A", "A", "B", "B", "B", "B"))
-#1
-
-#entropy (c("C", "A", "A", "A", "B", "B", "B", "B"))
-# 1.405639
-
-#entropy (c("C", "A", "D", "A", "B", "B", "B", "B"))
-# 1.75
-
-# entropy (c(1, 1, 2, 1, 1, 1, 2, 1))
-#0.8112781
-
-
-# Written by Grace
-read_input_table <- function(path) {
-  utils::read.delim(
-    path,
-    header = TRUE,
-    sep = "\t",
-    fill = TRUE,
-    comment.char = "",
-    check.names = FALSE,
-    row.names = 1
-  )
+tweedie_entropy <- function(target) {
+  observed <- as.character(target[!is.na(target)])
+  categories <- unique(observed)
+  category_counts <- tabulate(match(observed, categories), nbins = length(categories))
+  probabilities <- category_counts / length(target)
+  sum(probabilities * log2(1 / probabilities))
 }
 
 merge_method_args <- function(defaults, overrides) {
@@ -211,7 +138,7 @@ p0_transform_features <- function(features,
                                   pseudocount = 1) {
   transform <- toupper(transform)
   if (transform == "NONE") {
-    return(as.data.frame(features))
+    return(features)
   }
 
   x <- as.matrix(features)
@@ -297,10 +224,12 @@ extractAssay <- function(input, assay_name = "counts") {
   if (assay_name %in% SummarizedExperiment::assayNames(input)) {
     counts_data <- SummarizedExperiment::assay(input, assay_name)
     message("The specified assay has been extracted")
-    return(as.data.frame(as.matrix(counts_data)))
+    return(counts_data)
   } else {
-    message("The specified assay was not found")
-    return(NULL)
+    stop(sprintf(
+      "Assay '%s' was not found. Available assays: %s.",
+      assay_name, paste(SummarizedExperiment::assayNames(input), collapse = ", ")
+    ))
   }
 }
 
@@ -324,9 +253,6 @@ extract_multiassay_experiments <- function(input) {
 
 extract_multiassay_metadata <- function(input, input_metadata = NULL) {
   if (!is.null(input_metadata)) {
-    if (is.character(input_metadata)) {
-      return(read_input_table(input_metadata))
-    }
     return(input_metadata)
   }
   metadata <- as.data.frame(SummarizedExperiment::colData(input))
@@ -424,7 +350,9 @@ run_multiassay_tweedieverse <- function(input_features,
                                         plot_scatter = FALSE,
                                         heatmap_first_n = 50,
                                         reference = NULL,
-                                        min_presence_absence_count = 3L) {
+                                        min_presence_absence_count = 3L,
+                                        return_all = FALSE,
+                                        median_comparison_seed = NULL) {
   if (!is.null(method_args) && !is.null(method.args)) {
     stop("Please provide only one of method_args or method.args.")
   }
@@ -439,9 +367,27 @@ run_multiassay_tweedieverse <- function(input_features,
     names(experiments) <- omics_names
   }
   metadata <- extract_multiassay_metadata(input_features, input_metadata)
+  sample_map <- as.data.frame(MultiAssayExperiment::sampleMap(input_features))
 
   results <- lapply(omics_names, function(omics_name) {
     experiment <- coerce_multiassay_experiment_input(experiments[[omics_name]])
+    experiment_map <- sample_map[sample_map$assay == omics_name, , drop = FALSE]
+    primary_samples <- experiment_map$primary[
+      match(colnames(experiment), experiment_map$colname)
+    ]
+    if (anyNA(primary_samples)) {
+      stop(sprintf("sampleMap does not map every column in experiment %s.", omics_name))
+    }
+    matched_samples <- primary_samples %in% rownames(metadata)
+    if (!any(matched_samples)) {
+      stop(sprintf("Sample metadata has no primary samples for experiment %s.", omics_name))
+    }
+    experiment <- experiment[, matched_samples, drop = FALSE]
+    primary_samples <- primary_samples[matched_samples]
+    experiment_metadata <- as.data.frame(
+      metadata[match(primary_samples, rownames(metadata)), , drop = FALSE]
+    )
+    rownames(experiment_metadata) <- colnames(experiment)
     omics_output <- NULL
     if (!is.null(output)) {
       omics_output <- file.path(output, make.names(omics_name))
@@ -449,7 +395,7 @@ run_multiassay_tweedieverse <- function(input_features,
 
     fit <- .Tweedieverse_single(
       input_features = experiment,
-      input_metadata = metadata,
+      input_metadata = experiment_metadata,
       output = omics_output,
       assay_name = resolve_multiomics_arg(assay_name, omics_name, omics_names, "assay_name"),
       abd_threshold = resolve_multiomics_arg(abd_threshold, omics_name, omics_names, "abd_threshold"),
@@ -484,9 +430,13 @@ run_multiassay_tweedieverse <- function(input_features,
       reference = resolve_multiomics_arg(reference, omics_name, omics_names, "reference"),
       min_presence_absence_count = resolve_multiomics_arg(
         min_presence_absence_count, omics_name, omics_names, "min_presence_absence_count"
+      ),
+      return_all = resolve_multiomics_arg(return_all, omics_name, omics_names, "return_all"),
+      median_comparison_seed = resolve_multiomics_arg(
+        median_comparison_seed, omics_name, omics_names, "median_comparison_seed"
       )
     )
-    fit$omics <- omics_name
+    fit$omics <- rep(omics_name, nrow(fit))
     fit <- dplyr::select(fit, dplyr::all_of("omics"), dplyr::everything())
     fit
   })
@@ -599,10 +549,15 @@ compute_tweedieverse_size_factor <- function(features,
     return(rep(1, nrow(features)))
   }
 
-  x <- as.matrix(features)
-  storage.mode(x) <- "numeric"
+  x <- features
+  if (!inherits(x, "sparseMatrix")) {
+    x <- as.matrix(x)
+    storage.mode(x) <- "numeric"
+  }
 
-  if (any(!is.finite(x), na.rm = TRUE)) {
+  if (any(vapply(seq_len(ncol(x)), function(i) {
+    any(!is.finite(x[, i]) & !is.na(x[, i]))
+  }, logical(1)))) {
     stop("Features must contain only finite values for size-factor normalization.")
   }
 
@@ -610,17 +565,18 @@ compute_tweedieverse_size_factor <- function(features,
     if (any(x < 0, na.rm = TRUE)) {
       stop(sprintf("%s size factors require non-negative features.", normalization))
     }
-    return(center_tweedieverse_size_factor(rowSums(x, na.rm = TRUE)))
+    return(center_tweedieverse_size_factor(Matrix::rowSums(x, na.rm = TRUE)))
   }
 
   if (normalization == "MEDIAN") {
-    size_factor <- apply(x, 1, function(row) {
+    size_factor <- vapply(seq_len(nrow(x)), function(i) {
+      row <- as.numeric(x[i, ])
       vals <- row[is.finite(row) & !is.na(row) & row > 0]
       if (length(vals) == 0L) {
         return(NA_real_)
       }
       stats::median(vals)
-    })
+    }, numeric(1))
     return(center_tweedieverse_size_factor(size_factor))
   }
 
@@ -652,20 +608,22 @@ compute_tweedieverse_size_factor <- function(features,
 }
 
 compute_rle_size_factor <- function(x) {
-  geom_means <- apply(x, 2, function(col) {
+  geom_means <- vapply(seq_len(ncol(x)), function(i) {
+    col <- as.numeric(x[, i])
     vals <- col[col > 0]
     if (length(vals) == 0L) {
       return(NA_real_)
     }
     exp(mean(log(vals)))
-  })
+  }, numeric(1))
   keep <- is.finite(geom_means) & geom_means > 0
   if (!any(keep)) {
     stop("RLE size factors could not be computed because no feature has positive values.")
   }
-  ratios <- sweep(x[, keep, drop = FALSE], 2, geom_means[keep], "/")
-  ratios[ratios <= 0] <- NA_real_
-  size_factor <- apply(ratios, 1, stats::median, na.rm = TRUE)
+  size_factor <- vapply(seq_len(nrow(x)), function(i) {
+    ratios <- as.numeric(x[i, keep]) / geom_means[keep]
+    stats::median(ratios[ratios > 0], na.rm = TRUE)
+  }, numeric(1))
   center_tweedieverse_size_factor(size_factor)
 }
 
@@ -699,7 +657,8 @@ compute_css_size_factor <- function(x, percentile = 0.75) {
     stop("CSS size factors require at least one positive feature value.")
   }
   threshold <- as.numeric(stats::quantile(positive_values, probs = percentile, names = FALSE))
-  size_factor <- rowSums(ifelse(x <= threshold, x, 0), na.rm = TRUE)
+  x[x > threshold] <- 0
+  size_factor <- Matrix::rowSums(x, na.rm = TRUE)
   center_tweedieverse_size_factor(size_factor)
 }
 
@@ -707,7 +666,7 @@ compute_tmm_size_factor <- function(x) {
   if (!requireNamespace("edgeR", quietly = TRUE)) {
     stop("edgeR is required for normalization = 'TMM'. Install edgeR or choose another normalization.")
   }
-  counts <- t(x)
+  counts <- Matrix::t(x)
   dge <- edgeR::DGEList(counts = counts)
   dge <- edgeR::calcNormFactors(dge, method = "TMM")
   size_factor <- dge$samples$lib.size * dge$samples$norm.factors
@@ -719,12 +678,19 @@ compute_scran_size_factor <- function(x) {
       !requireNamespace("SingleCellExperiment", quietly = TRUE)) {
     stop("scran and SingleCellExperiment are required for normalization = 'SCRAN'. Install them or choose another normalization.")
   }
-  sce <- SingleCellExperiment::SingleCellExperiment(list(counts = t(x)))
+  sce <- SingleCellExperiment::SingleCellExperiment(list(counts = Matrix::t(x)))
   sce <- scran::computeSumFactors(sce)
   size_factor <- SingleCellExperiment::sizeFactors(sce)
   center_tweedieverse_size_factor(size_factor)
 }
 
+
+# The simulation and covariance-adjustment code in median_comparison_tweedie()
+# is adapted from the median-comparison routines in MaAsLin 3, R/fit.R.
+# Upstream authors: William Nickols and Jacob Nearing.
+# Source: https://github.com/biobakery/maaslin3/blob/master/R/fit.R
+# License: MIT. Copyright 2025 Harvard School of Public Health.
+# The upstream copyright and permission notice is retained in inst/COPYRIGHTS.
 
 #' Median Comparison for Compositionality Adjustment
 #'
@@ -762,6 +728,10 @@ compute_scran_size_factor <- function(x) {
 #'         resulting p-value in `pval_median`.
 #' }
 #'
+#' @param seed Optional non-negative integer seed for the simulations. Default is NULL,
+#' which uses the current random-number stream. A supplied seed is scoped with withr
+#' and restores the preceding random-number state when this function exits.
+#'
 #' @return
 #' The input `df` with two new columns:
 #' \describe{
@@ -776,6 +746,12 @@ compute_scran_size_factor <- function(x) {
 #' zero or missing.
 #'
 #' @seealso [MaAsLin 3 GitHub](https://github.com/biobakery/maaslin3)
+#'
+#' @section Attribution:
+#' The simulation and covariance-adjustment code is adapted from MaAsLin 3
+#' by William Nickols and Jacob Nearing, distributed under the MIT license.
+#' Copyright 2025 Harvard School of Public Health.
+#' The upstream notice is included in the package's COPYRIGHTS file.
 #'
 #' @examples
 #' toy <- data.frame(
@@ -793,7 +769,15 @@ median_comparison_tweedie <- function(df,
                                       p_cutoff = 0.95,
                                       subtract_median = FALSE,
                                       n_sims = 10000,
-                                      median_threshold = 0) {
+                                      median_threshold = 0,
+                                      seed = NULL) {
+  if (!is.null(seed)) {
+    if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
+        seed < 0 || seed > .Machine$integer.max || seed != floor(seed)) {
+      stop("seed must be NULL or a single non-negative integer.")
+    }
+    withr::local_seed(seed)
+  }
   # df is your Tweedieverse output data.frame with columns:
   #   taxon, metadata, effect_size, pval, stderr, qval
   #

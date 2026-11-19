@@ -1,4 +1,67 @@
 Changes in version 0.99.1 (2026-11-18):
+* Keep zero-row MultiAssayExperiment result tables when a layer has no
+  significant associations, preserving the other layers and output columns.
+* Compare existing Bioconductor and CRAN modeling tools in the vignette and
+  describe the workflow Tweedieverse adds.
+* Expand the vignette with output-column explanations,
+  worked interpretations, and an association heatmap.
+  Update README examples to use defined containers.
+* Provide individual RDS example files and load them explicitly with readRDS().
+  Retain the combined RData bundle for compatibility.
+* Replace the three toy containers with compact real-data subsets from the
+  TweedieLabs source datasets: HMP2, PBMC3k, and SC2P brain data from GSE67835.
+  Record preparation steps, source checksums, and dataset-specific licences.
+* Document sources, processing, and per-object licences for the bundled data.
+  Add a reconstruction script using pinned public source files and checksums.
+  Remove redundant TSV files and the tracked .DS_Store, and
+  exclude docs/ from package builds.
+* Record Ali Rahnavard as a contributor and copyright holder and Himel Mallick
+  as an author and copyright holder. Remove redundant contributor roles from
+  authors.
+* Replace the RPubs-derived entropy implementation with a direct calculation
+  from Shannon's formula, preserving metadata-filtering and missing-value
+  behavior. Retain historical source credit and remove unused information-gain
+  helpers from the same source.
+* Remove read_input_table() and obsolete feature/metadata file-input branches
+  from internal association plotting.
+* Credit MaAsLin 3 authors William Nickols and Jacob Nearing for adapted
+  median-comparison simulation and covariance-adjustment code. Record its
+  MIT license and retain the upstream copyright and permission notice.
+* Move legacy-input validation into a seeded test and strengthen
+  MultiAssayExperiment simulations to verify known effects and per-layer offsets.
+* Rename the exported theme_omicsEye() helper to tweedie_theme() and update
+  plotting functions and documentation.
+* Rename the exported entropy() helper to tweedie_entropy() and update its
+  internal callers and documentation. Clarify the default metadata filter.
+* Restore logging handlers and levels after output-producing calls and after
+  the MaAsLin2 backend, including when a call fails.
+* Compute feature sample counts and zero proportions with column sums and
+  match them to association rows by feature name.
+* Remove obsolete commented-out code and inline entropy example comments.
+* Validate link, base_model, correction, optimizer, and domain using match.arg(),
+  so invalid optimizer errors list the optimizer choices.
+* Report a failed feature fit once with its name and error reason, without
+  retrying the identical fit.
+* Add median_comparison_seed to Tweedieverse() and seed to
+  median_comparison_tweedie(). Scope supplied simulation seeds with withr.
+* Add return_all = TRUE to retrieve the full result table in memory, including
+  with output = NULL and for individual MultiAssayExperiment layers.
+* Align container assay columns directly with metadata row names and report
+  informative errors for unmatched samples, missing effects, and missing assays.
+* Preserve sparse assays through filtering and Tweedie fitting and pass sparse
+  counts directly to scran. Remove obsolete table-input branches from the
+  analysis path.
+* Exclude missing q-values when selecting significant results after median
+  comparison.
+* Align MultiAssayExperiment sample metadata using sampleMap, including assay
+  column names that differ from primary sample names.
+* Clarify fixed-effect offset formulas by using + offset(log(offset)).
+  R treats - offset(...) as equivalent to + offset(...), so the original
+  fixed-effect models already included the offset.
+* Preserve log size-factor offsets when adding random effects. The previous
+  mixed-effect formula reconstruction dropped the offset.
+* Add regression tests that verify offsets in fixed-effect and mixed-effect
+  abundance models and compare adjust_offset = TRUE and FALSE.
 * Add min_presence_absence_count, which defaults to three detected and three
   undetected samples per feature. Retained features below either minimum skip
   the prevalence fit.

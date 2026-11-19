@@ -9,3 +9,4 @@
 ^\.Rhistory$
 ^inst/\.DS_Store$
 ^tests/\.DS_Store$
+^docs$

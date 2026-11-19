@@ -2,9 +2,9 @@
 
 export(Tweedieverse)
 export(Tweedieverse_heatmap)
-export(entropy)
+export(tweedie_entropy)
 export(median_comparison_tweedie)
-export(theme_omicsEye)
+export(tweedie_theme)
 importClassesFrom(TreeSummarizedExperiment,TreeSummarizedExperiment)
 importFrom(SummarizedExperiment,colData)
 importFrom(dplyr,"%>%")

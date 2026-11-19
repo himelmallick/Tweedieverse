@@ -40,7 +40,9 @@ Tweedieverse(
   plot_scatter = FALSE,
   heatmap_first_n = 50,
   reference = NULL,
-  min_presence_absence_count = 3L
+  min_presence_absence_count = 3L,
+  return_all = FALSE,
+  median_comparison_seed = NULL
 )
 }
 \arguments{
@@ -82,8 +84,9 @@ are retained. Default value for \code{prev_threshold} is \code{0.1}.}
 \code{var_threshold} are retained. This step is done after the prevalence-abundance filtering.
 Default value for \code{var_threshold} is \code{0.0} (i.e. no variance filtering).}
 
-\item{entropy_threshold}{If entropy-based filtering is desired for metadata, only features that have entropy greater than
-\code{entropy_threshold} are retained. Default value for \code{entropy_threshold} is \code{0.0} (i.e. no entropy filtering).}
+\item{entropy_threshold}{Metadata columns are retained when their entropy, computed by
+\code{tweedie_entropy()}, exceeds this threshold. Default is 0, which removes
+metadata columns with zero entropy, including constant columns.}
 
 \item{base_model}{The per-feature base model. Only "CPLM" is supported.}
 
@@ -141,6 +144,11 @@ When the resolved Tweedie index is \code{0}, non-identity links are changed to \
 
 \item{median_subtraction}{If TRUE, coefficients minus median will be used for compositionality adjustment.}
 
+\item{median_comparison_seed}{Optional non-negative integer seed for the median-comparison
+simulations. Default is NULL, which uses the current random-number stream.
+A supplied seed is scoped with withr and restores the preceding random-number state
+after the median-comparison calculation.}
+
 \item{run_presence_absence_model}{If TRUE, also fit a DAssemble-style presence-absence logistic regression model
 alongside the selected abundance model, including the MaAsLin2 path used by default for \code{tweedie_p = 0}.
 Retains individual abundance and presence-absence model results, and ranks features by a Cauchy combination test
@@ -175,11 +183,17 @@ Ignored for random effects modeling which uses an alternative Template Model Bui
 \item{heatmap_first_n}{In heatmap, plot top N features with significant associations (default is 50).}
 
 \item{reference}{The factor to use as a reference for a variable with more than two levels provided as a string of 'variable,reference' semi-colon delimited for multiple variables (default is NULL).}
+
+\item{return_all}{Logical. If TRUE, return the full result table before the
+significance threshold is applied, including when output is NULL.
+Default is FALSE, which returns associations passing max_significance.}
 }
 \value{
 For single-omics input, a data frame containing coefficient estimates, p-values,
 and q-values (multiplicity-adjusted p-values) is returned. For \code{MultiAssayExperiment}
 input, a named list of omics-specific result data frames is returned.
+With \code{return_all = TRUE}, each table contains the results before
+filtering by \code{max_significance}.
 }
 \description{
 Fit a per-feature Tweedie generalized linear model to omics features.

@@ -23,7 +23,7 @@ fit.Tweedieverse <- function(features,
       formula <-
         as.formula(paste("expr ~ ", paste(all_available_metadata, collapse = "+")))
     if (adjust_offset)
-      formula <- update(formula, . ~ . - offset(log(offset)))
+      formula <- update(formula, . ~ . + offset(log(offset)))
   } else{
     if (is.null(formula))
       formula <-

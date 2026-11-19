@@ -28,15 +28,15 @@
 # individual associations as scatterplot and boxplot
 #  Visualization results are provided as pdf and RDS format to be used with manuscript quality.
 
-#' Omics-Eye Plot Theme
+#' Tweedieverse Plot Theme
 #'
 #' A compact ggplot2 theme used by Tweedieverse visualization functions.
 #'
 #' @return A list of ggplot2 theme elements.
 #' @examples
-#' theme_omicsEye()
+#' tweedie_theme()
 #' @export
-theme_omicsEye <- function() list(
+tweedie_theme <- function() list(
   cowplot::theme_cowplot(),
   ggplot2::theme(
     text               = ggplot2::element_text(size = 6),
@@ -347,12 +347,6 @@ association_plots <-
 
     # combine the data and metadata to one datframe using common rows
     # read Tweedieverse output
-    if (is.character(features)) {
-      features <- read_input_table(features)
-    }
-    if (is.character(metadata)) {
-      metadata <- read_input_table(metadata)
-    }
     common_rows <-
       intersect(rownames(features), rownames(metadata))
     input_df_all <-
@@ -459,7 +453,7 @@ association_plots <-
             ggplot2::labs() +
             ggplot2::xlab(x_label) +
             ggplot2::ylab(y_label) +
-            theme_omicsEye() +
+            tweedie_theme() +
             ggplot2::annotate(
               geom = "text",
               x = Inf,
@@ -530,7 +524,7 @@ association_plots <-
           # format the figure to default nature format
           # remove legend, add x/y labels
           temp_plot <- temp_plot +
-            theme_omicsEye() +
+            tweedie_theme() +
             ggplot2::theme(
               panel.grid.major = ggplot2::element_blank(),
               panel.grid.minor = ggplot2::element_blank(),
@@ -639,7 +633,7 @@ tweedie_index_plot <-
       ggplot2::aes(x=tweedie.index))+
       ggplot2::geom_histogram(position = "identity", alpha = 0.8)  +
       ggplot2::xlab("Tweedie index") + ggplot2::ylab("Number of omics features") +
-      theme_omicsEye() +
+      tweedie_theme() +
       ggplot2::theme(legend.justification = c(0, 0),
                      legend.position = c(.3, .5))
 

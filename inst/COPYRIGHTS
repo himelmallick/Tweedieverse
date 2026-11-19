@@ -1,0 +1,47 @@
+MaAsLin 3 components
+===================
+
+The simulation and covariance-adjustment code in median_comparison_tweedie()
+is adapted from the median-comparison routines in MaAsLin 3, R/fit.R.
+Upstream authors: William Nickols and Jacob Nearing.
+Source: https://github.com/biobakery/maaslin3/blob/master/R/fit.R
+Upstream package license: MIT + file LICENSE.
+Upstream notice: https://github.com/biobakery/maaslin3/blob/master/LICENSE
+
+The following copyright and permission notice is retained from MaAsLin 3.
+
+YEAR: 2025
+COPYRIGHT HOLDER: Harvard School of Public Health
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+MaAsLin2 HMP2 example data
+========================
+
+microbiome_tse is a subset of the HMP2 taxonomy and metadata tables distributed
+with MaAsLin2, under MIT + file LICENSE.
+Source: https://github.com/biobakery/Maaslin2
+Upstream notice: https://github.com/biobakery/Maaslin2/blob/master/LICENSE
+
+YEAR: 2018
+COPYRIGHT HOLDER: Harvard School of Public Health
+
+The MIT permission and warranty notice reproduced above applies to these
+MaAsLin2 example data as well. Preparation and original study attribution are
+recorded in inst/scripts/README.md and inst/extdata/DATA_LICENSES.md.

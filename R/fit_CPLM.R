@@ -44,10 +44,12 @@ fit.CPLM <- function(features,
 
     tmp <- file.path(tempdir(), paste0("maaslin2_", sample(1e8, 1)))
     dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
+    logger <- logging::getLogger()
+    previous_handlers <- logger$handlers
+    previous_level <- logger$level
     on.exit({
-      if (requireNamespace("logging", quietly = TRUE)) {
-        try(logging::removeHandler("logging::writeToFile"), silent = TRUE)
-      }
+      logger$handlers <- previous_handlers
+      logger$level <- previous_level
       unlink(tmp, recursive = TRUE)
     }, add = TRUE)
 
@@ -57,7 +59,7 @@ fit.CPLM <- function(features,
       Maaslin2::Maaslin2,
       merge_method_args(
         list(
-          input_data = features,
+          input_data = as.data.frame(as.matrix(features)),
           input_metadata = maaslin_metadata,
           output = tmp,
           fixed_effects = fixed_effects,
@@ -177,10 +179,8 @@ fit.CPLM <- function(features,
     # Random effects modeling #
     ###########################
     
-    fixed_terms <- setdiff(all.vars(formula)[-1], "offset")
-    formula <-
-      paste('. ~', paste(fixed_terms, collapse = ' + '), '.', sep = ' + ')
-    formula <- update(random_effects_formula, formula)
+    random_terms <- paste(deparse(random_effects_formula[[3L]]), collapse = " ")
+    formula <- update(formula, paste(". ~ . +", random_terms))
     
     model_function <- function(formula,
                                data,
@@ -261,41 +261,33 @@ fit.CPLM <- function(features,
       # Fit model #
       #############
       
-      fit <- tryCatch({
-        fit1 <-
-          model_function(
-            formula = formula,
-            data = dat_sub,
-            link = link,
-            tweedie_p = tweedie_p,
-            optimizer = optimizer,
-            na.action = na.action
-          )
-      }, error = function(err) {
-        fit1 <-
-          try({
-            model_function(
-              formula = formula,
-              data = dat_sub,
-              link = link,
-              tweedie_p = tweedie_p,
-              optimizer = optimizer,
-              na.action = na.action
-            )
-          })
-        return(fit1)
-      })
-      
+      fit <- tryCatch(
+        model_function(
+          formula = formula,
+          data = dat_sub,
+          link = link,
+          tweedie_p = tweedie_p,
+          optimizer = optimizer,
+          na.action = na.action
+        ),
+        error = function(err) {
+          warning(sprintf(
+            "Model fit failed for feature '%s': %s",
+            colnames(features)[x], conditionMessage(err)
+          ), call. = FALSE)
+          NULL
+        }
+      )
+
       #################
       # Gather Output #
       #################
       
       output <- list()
-      if (all(!inherits(fit, "try-error"))) {
+      if (!is.null(fit)) {
         output$para <- summary_function(fit)
       }
       else{
-        logging::logwarn("Fitting problem for feature %s returning NA", x)
         output$para <-
           as.data.frame(matrix(NA,  nrow = length(metadata_names), ncol = 5))
         output$para$name <-
