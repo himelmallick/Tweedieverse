@@ -20,11 +20,11 @@ Missing values are excluded from category counts but included in the
 denominator to preserve the package's metadata-filtering convention.
 Empty and entirely missing vectors return zero.
 }
+\examples{
+tweedie_entropy(c("A", "A", "B", "B", "C"))
+}
 \references{
 Shannon CE (1948). A Mathematical Theory of Communication.
 Bell System Technical Journal, 27, 379-423.
 \doi{10.1002/j.1538-7305.1948.tb01338.x}.
-}
-\examples{
-tweedie_entropy(c("A", "A", "B", "B", "C"))
 }

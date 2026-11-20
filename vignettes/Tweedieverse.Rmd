@@ -3,17 +3,17 @@ title: "Tweedieverse"
 author: "Nalin Arora, Ziyu Liu, Ali Rahnavard,Himel Mallick"
 date: "`r BiocStyle::doc_date()`"
 output:
-  BiocStyle::html_document:
-    toc: true
-    toc_depth: 3
+    BiocStyle::html_document:
+        toc: true
+        toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{Tweedieverse}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+    %\VignetteIndexEntry{Tweedieverse}
+    %\VignetteEngine{knitr::rmarkdown}
+    %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", dpi = 160)
 ```
 
 ## Overview
@@ -39,9 +39,9 @@ This vignette demonstrates six Bioconductor-oriented workflows:
 - single-cell RNA-seq non-UMI/read counts stored in a `SingleCellExperiment`,
 - pseudobulk RNA-seq counts generated with `muscat::aggregateData()`,
 - bulk RNA-seq counts from the Bioconductor `airway` dataset stored in a
-  `SummarizedExperiment`,
+    `SummarizedExperiment`,
 - matched microbiome and metabolomics assays stored in a
-  `MultiAssayExperiment`.
+    `MultiAssayExperiment`.
 
 ## Motivation
 
@@ -50,9 +50,11 @@ statistical properties (such as overdispersion and zero-inflation) across
 experimental platforms (or library preparation protocols). Most published
 differential analysis methods are omics-specific and assume a single
 probabilistic model for all features. `DESeq2` and `edgeR` use the negative
-binomial distribution for sequencing counts, while `MAST` for single-cell
-expression, `MaAsLin2` and `MaAsLin3` for microbiome abundances, and `limma` (microarray and RNA-seq) fit Gaussian linear models
-to transformed data.
+binomial distribution for sequencing counts. `MAST` uses a two-part hurdle
+model for single-cell expression. `MaAsLin2` supports several microbiome
+association models, including linear and compound Poisson models, while
+`MaAsLin3` models prevalence and abundance separately. `limma` fits linear
+models to expression data, including transformed RNA-seq measurements.
 
 These choices ignore the fact that data distributions are feature-specific and
 vary considerably both within and between platforms or technologies. A typical
@@ -64,25 +66,24 @@ sizes and significance calls are difficult to compare.
 data types. It is built on Tweedie generalized linear models, whose flexibility
 enables feature-specific modeling of omics data by adjusting a single
 configuration parameter per feature: the Tweedie index `p`, which spans the
-Gaussian, Poisson, compound Poisson-gamma, gamma, and invrse Gaussain distributions.
+Gaussian, Poisson, compound Poisson-gamma, gamma, and inverse Gaussian
+distributions.
 `Tweedieverse` estimates `p` separately for each feature, so every feature is
 modeled with a mean-variance relationship learned from its own data. This
-yields a unified framework that adapts to the underlying biological and
-technological variability in multi-omics profiles, providing efficient control
-of false discovery rate and high statistical power. Comprehensive benchmrk reveal
-that `Tweedieverse` can be more powerful than existing
-methods and disclose biological discoveries that one-size-fits-all approaches
-do not reveal.
+yields a unified framework that adapts to biological and technological
+variability in multi-omics profiles. Model adequacy and study design determine
+the validity and power of the resulting tests; these examples demonstrate the
+workflow rather than benchmark comparative performance.
 
 With `Tweedieverse`, users can:
 
 - run differential analysis on microbiome, single-cell, pseudobulk, bulk
-  RNA-seq, and metabolomics data with one function, `Tweedieverse()`;
+    RNA-seq, and metabolomics data with one function, `Tweedieverse()`;
 - pass data directly as a `SummarizedExperiment`, `SingleCellExperiment`,
-  `TreeSummarizedExperiment`, or `MultiAssayExperiment`, with sample metadata
-  and feature annotations kept intact;
+    `TreeSummarizedExperiment`, or `MultiAssayExperiment`, with sample metadata
+    and feature annotations kept intact;
 - compare results across assays on a common scale, since every assay is
-  analyzed with the same model family, testing procedure, and output format.
+    analyzed with the same model family, testing procedure, and output format.
 
 The sections below walk through each of these workflows.
 
@@ -90,19 +91,23 @@ The sections below walk through each of these workflows.
 
 Bioconductor provides established differential-analysis workflows:
 [DESeq2](https://bioconductor.org/packages/DESeq2) and
-[edgeR](https://bioconductor.org/packages/edgeR) use negative-binomial models for
+[edgeR](https://bioconductor.org/packages/edgeR) use negative-binomial models
+for
 sequencing counts; [limma](https://bioconductor.org/packages/limma) uses linear
 models with empirical Bayes inference, including precision-weighted RNA-seq
-analysis with voom. [MAST](https://bioconductor.org/packages/MAST) uses a two-part
+analysis with voom. [MAST](https://bioconductor.org/packages/MAST) uses a
+two-part
 hurdle model for single-cell detection and positive expression.
 [MaAsLin2](https://bioconductor.org/packages/Maaslin2) offers multivariable
 meta-omic association analysis with several model choices, including compound
-Poisson models, while [MaAsLin3](https://bioconductor.org/packages/maaslin3)
+Poisson models, while
+[MaAsLin3](https://bioconductor.org/packages/release/bioc/html/maaslin3.html)
 combines prevalence and abundance analyses.
 
 Tweedie modeling is also available through general-purpose CRAN tools.
 [cplm](https://CRAN.R-project.org/package=cplm) fits compound Poisson regression
-models, and [glmmTMB](https://CRAN.R-project.org/package=glmmTMB) supports Tweedie
+models, and [glmmTMB](https://CRAN.R-project.org/package=glmmTMB) supports
+Tweedie
 generalized linear mixed models.
 [statmod](https://CRAN.R-project.org/package=statmod) supplies Tweedie GLM
 families, while [tweedie](https://CRAN.R-project.org/package=tweedie) provides
@@ -115,7 +120,8 @@ domain-specific size-factor offsets, feature-wise fitting, optional prevalence
 tests, multiple-testing correction, and consistently structured association
 tables. It supports both fixed and estimated variance powers and analyzes
 `MultiAssayExperiment` layers through the same interface. Each layer is fitted
-independently; effect sizes retain their assay- and link-specific interpretation.
+independently; effect sizes retain their assay- and link-specific
+interpretation.
 
 ## Installation
 
@@ -123,7 +129,7 @@ After Bioconductor acceptance, the release version can be installed with:
 
 ```{r install-bioc, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
+    install.packages("BiocManager")
 }
 
 BiocManager::install("Tweedieverse")
@@ -133,14 +139,13 @@ The development version can be installed from GitHub:
 
 ```{r install-github, eval=FALSE}
 if (!requireNamespace("remotes", quietly = TRUE)) {
-  install.packages("remotes")
+    install.packages("remotes")
 }
 
 remotes::install_github("himelmallick/Tweedieverse")
 ```
 
 ```{r packages}
-
 library(Tweedieverse)
 library(SummarizedExperiment)
 library(SingleCellExperiment)
@@ -156,28 +161,32 @@ The example containers used in this vignette are distributed with the package
 under `inst/extdata`. This allows the vignette to run during Bioconductor
 checks without network access.
 
-The microbiome, UMI, and non-UMI examples are compact subsets of the real
-datasets used in the original
+The microbiome and UMI examples are compact subsets of the real HMP2 and
+PBMC3k datasets used in the original
 [TweedieLabs tutorials](https://github.com/himelmallick/TweedieLabs).
-They contain HMP2 baseline microbiomes, PBMC3k CD4/CD8 cells, and brain
-astrocytes/oligodendrocytes from GSE67835. The Franzosa multi-omics example
-comes from the [HuMMANet v1 archive](https://doi.org/10.5281/zenodo.22053943).
+The non-UMI example uses CC BY 4.0 Tabula Muris Smart-seq2 brain data.
+The Franzosa multi-omics example comes from the
+[HuMMANet v1 archive](https://doi.org/10.5281/zenodo.22053943).
 The preparation code, source details, and per-object licences are included in
 scripts/rebuild_example_data.R, scripts/README.md, and
 extdata/DATA_LICENSES.md inside the installed package.
 
 ```{r load-example-data}
 microbiome_tse <- readRDS(system.file(
-  "extdata", "microbiome_tse.rds", package = "Tweedieverse"
+    "extdata", "microbiome_tse.rds",
+    package = "Tweedieverse"
 ))
 umi_sce <- readRDS(system.file(
-  "extdata", "umi_sce.rds", package = "Tweedieverse"
+    "extdata", "umi_sce.rds",
+    package = "Tweedieverse"
 ))
 nonumi_sce <- readRDS(system.file(
-  "extdata", "nonumi_sce.rds", package = "Tweedieverse"
+    "extdata", "nonumi_sce.rds",
+    package = "Tweedieverse"
 ))
 franzosa_example_mae <- readRDS(system.file(
-  "extdata", "franzosa_example_mae.rds", package = "Tweedieverse"
+    "extdata", "franzosa_example_mae.rds",
+    package = "Tweedieverse"
 ))
 ```
 
@@ -190,7 +199,9 @@ samples in columns; `colData` contains sample metadata.
 This subset contains the 20 most variable taxa across 48 baseline HMP2 samples,
 with 16 samples each from the nonIBD, CD, and UC groups. The source tables are
 distributed with MaAsLin2. Baseline selection and metadata preparation follow
-the [original microbiome tutorial](https://github.com/himelmallick/TweedieLabs/blob/master/R/Tweedieverse_microbiome.Rmd).
+the
+[original microbiome tutorial](https://github.com/himelmallick/TweedieLabs)
+.
 
 The example table contains relative abundances, so this analysis disables
 additional offset normalization by setting `normalization = "NONE"`. For raw
@@ -201,16 +212,16 @@ size-factor offset.
 microbiome_tse
 
 microbiome_fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  output = NULL,
-  assay_name = "counts",
-  domain = "microbiome",
-  normalization = "NONE",
-  fixed_effects = c("diagnosis", "antibiotics", "age"),
-  reference = "diagnosis,nonIBD",
-  return_all = TRUE,
-  tweedie_p = NULL,
-  median_comparison = FALSE
+    input_features = microbiome_tse,
+    output = NULL,
+    assay_name = "counts",
+    domain = "microbiome",
+    normalization = "NONE",
+    fixed_effects = c("diagnosis", "antibiotics", "age"),
+    reference = "diagnosis,nonIBD",
+    return_all = TRUE,
+    tweedie_p = NULL,
+    median_comparison = FALSE
 )
 
 head(microbiome_fit)
@@ -222,13 +233,23 @@ Each row describes one feature--covariate coefficient. Factor variables can
 produce several rows per feature, one per non-reference level. These examples
 use `median_comparison = FALSE` and the default log link.
 
-| Column | Meaning |
-| --- | --- |
-| `feature`, `metadata`, `value` | Feature identifier, tested covariate, and factor level or continuous predictor name. Factor effects are relative to the reference level. |
-| `coef`, `stderr` | Estimated coefficient and its standard error on the link scale. With a log link, `exp(coef)` is the fitted mean ratio at equal offsets. Continuous covariates are standardized by default, so their coefficients describe a one-standard-deviation increase unless `standardize = FALSE`. |
-| `pval`, `qval` | Unadjusted test p-value and multiple-testing adjusted p-value (Benjamini--Hochberg by default across the reported coefficient tests within an assay). |
-| `base.model`, `tweedie.index` | Model engine/family label and estimated or fixed variance power. |
-| `N`, `N.not.zero`, `percent.zero` | Aligned sample count, number with positive measurements, and rounded percentage of observed measurements equal to zero. Missing model covariates can reduce a particular fit's effective sample count. |
+- `feature` , `metadata` , `value` : Feature identifier, tested covariate, and
+    factor level or continuous predictor name. Factor effects are relative to
+    the reference level.
+- `coef` , `stderr` : Estimated coefficient and its standard error on the link
+    scale. With a log link, `exp(coef)` is the fitted mean ratio at equal
+    offsets. Continuous covariates are standardized by default, so their
+    coefficients describe a one-standard-deviation increase unless
+    `standardize = FALSE` .
+- `pval` , `qval` : Unadjusted test p-value and multiple-testing adjusted
+    p-value (Benjamini--Hochberg by default across the reported coefficient
+    tests within an assay).
+- `base.model` , `tweedie.index` : Model engine/family label and estimated or
+    fixed variance power.
+- `N` , `N.not.zero` , `percent.zero` : Aligned sample count, number with
+    positive measurements, and rounded percentage of observed measurements equal
+    to zero. Missing model covariates can reduce a particular fit's effective
+    sample count.
 
 `return_all = TRUE` keeps the full result table in memory. The default returns
 only rows with `qval <= max_significance` (default 0.05). An empty default table
@@ -242,7 +263,7 @@ these q-values are not results from testing the entire source dataset.
 diagnosis_results <- subset(microbiome_fit, metadata == "diagnosis")
 diagnosis_results$mean_ratio <- exp(diagnosis_results$coef)
 head(diagnosis_results[, c(
-  "feature", "value", "coef", "mean_ratio", "pval", "qval"
+    "feature", "value", "coef", "mean_ratio", "pval", "qval"
 )], 2)
 ```
 
@@ -256,7 +277,8 @@ The second is **`r diagnosis_results$feature[2]`**, with coefficient
 `r signif(diagnosis_results$qval[2], 3)`.
 A positive coefficient indicates higher fitted relative abundance and a negative
 coefficient lower fitted relative abundance, adjusting for age and antibiotic
-use. These are conditional associations in this subset, not evidence of causality.
+use. These are conditional associations in this subset, not evidence of
+causality.
 
 ### Visualizing associations
 
@@ -269,15 +291,15 @@ stronger evidence. Empty feature--contrast combinations are displayed as zero;
 they do not establish absence of an effect. The plot's significance label refers
 to the chosen 0.25 cutoff.
 
-```{r microbiome-heatmap, fig.width=5.5, fig.height=1.8, dpi=160, out.width="100%"}
+```{r microbiome-heatmap, fig.width=5.5, fig.height=1.8, out.width="100%"}
 heatmap_results <- subset(microbiome_fit, !is.na(qval) & qval <= 0.25)
 Tweedieverse_heatmap(
-  output_results = heatmap_results,
-  cell_value = "qval",
-  first_n = 5,
-  title = "HMP2 associations (q <= 0.25)",
-  data_label = "Taxon",
-  metadata_label = "Covariate / contrast"
+    output_results = heatmap_results,
+    cell_value = "qval",
+    first_n = 5,
+    title = "HMP2 associations (q <= 0.25)",
+    data_label = "Taxon",
+    metadata_label = "Covariate / contrast"
 )
 ```
 
@@ -288,27 +310,29 @@ For single-cell RNA-seq data, `Tweedieverse()` accepts a
 
 This subset contains 20 genes and 60 PBMC3k cells, with 30 CD4 and 30 CD8 cells.
 Cell labels and raw UMI counts come from the processed object used in the
-[original UMI tutorial](https://github.com/himelmallick/TweedieLabs/blob/master/R/Tweedieverse_scRNASeq_UMI.Rmd).
+[original UMI tutorial](https://github.com/himelmallick/TweedieLabs)
+.
 Genes are selected by count variance across the retained cells.
 
 UMI counts are count-like. Here we pin the variance power to `p = 1`, the
 Poisson variance case, and use the single-cell domain. The library sizes in
 colData were calculated using all source genes before selecting the 20 genes.
-Passing `scale_factor = "library_size"` uses those full-library sizes as offsets.
+Passing `scale_factor = "library_size"` uses those full-library sizes as
+offsets.
 
 ```{r umi-fit}
 umi_sce
 
 umi_fit <- Tweedieverse(
-  input_features = umi_sce,
-  output = NULL,
-  assay_name = "counts",
-  domain = "single_cell",
-  scale_factor = "library_size",
-  fixed_effects = "CellType",
-  reference = "CellType,CD8",
-  tweedie_p = 1,
-  median_comparison = FALSE
+    input_features = umi_sce,
+    output = NULL,
+    assay_name = "counts",
+    domain = "single_cell",
+    scale_factor = "library_size",
+    fixed_effects = "CellType",
+    reference = "CellType,CD8",
+    tweedie_p = 1,
+    median_comparison = FALSE
 )
 
 head(umi_fit)
@@ -329,26 +353,31 @@ The non-UMI example uses read-count-like measurements. These can have a more
 flexible mean-variance relationship than UMI counts, so we leave
 `tweedie_p = NULL` and let Tweedieverse estimate the index after filtering.
 
-The source is SC2P's brain dataset from GSE67835, as used in the
-[original non-UMI tutorial](https://github.com/himelmallick/TweedieLabs/blob/master/R/Tweedieverse_scRNASeq_nonUMI.Rmd).
-This example retains 20 genes and 60 cells, balanced between astrocytes and
-oligodendrocytes. The SCRAN factors in colData were computed on all source genes
-for the retained cells before selecting the 20 most variable genes.
+The source is the original Tabula Muris Smart-seq2 FACS dataset, distributed
+under CC BY 4.0 in
+[Figshare version 8](https://doi.org/10.6084/m9.figshare.5829687.v8).
+This example retains 20 genes and 60 cells from mouse 3_10_M, balanced between
+astrocytes and oligodendrocytes. The SCRAN factors in colData were computed on
+all source genes for these cells before selecting the 20 most variable genes.
+The source counts are unchanged. This is a cell-type illustration within one
+mouse; it does not establish population-level differential expression across
+biological replicates. See the
+[original study](https://doi.org/10.1038/s41586-018-0590-4).
 
 ```{r nonumi-fit}
 nonumi_sce
 
 nonumi_fit <- Tweedieverse(
-  input_features = nonumi_sce,
-  output = NULL,
-  assay_name = "counts",
-  domain = "single_cell",
-  scale_factor = "source_size_factor",
-  fixed_effects = "celltype",
-  reference = "celltype,astrocytes",
-  standardize = FALSE,
-  tweedie_p = NULL,
-  median_comparison = FALSE
+    input_features = nonumi_sce,
+    output = NULL,
+    assay_name = "counts",
+    domain = "single_cell",
+    scale_factor = "source_size_factor",
+    fixed_effects = "celltype",
+    reference = "celltype,astrocyte",
+    standardize = FALSE,
+    tweedie_p = NULL,
+    median_comparison = FALSE
 )
 
 head(nonumi_fit)
@@ -387,51 +416,52 @@ data("example_sce", package = "muscat")
 pseudobulk_input <- example_sce[seq_len(100), ]
 
 pseudobulk_sce <- muscat::aggregateData(
-  pseudobulk_input,
-  assay = "counts",
-  fun = "sum",
-  by = c("cluster_id", "sample_id"),
-  verbose = FALSE
+    pseudobulk_input,
+    assay = "counts",
+    fun = "sum",
+    by = c("cluster_id", "sample_id"),
+    verbose = FALSE
 )
 
 SummarizedExperiment::assayNames(pseudobulk_sce)
 
 pseudobulk_assay <- "CD4 T cells"
 pseudobulk_counts <- SummarizedExperiment::assay(
-  pseudobulk_sce,
-  pseudobulk_assay
+    pseudobulk_sce,
+    pseudobulk_assay
 )
 top_pseudobulk_genes <- order(
-  rowSums(pseudobulk_counts),
-  decreasing = TRUE
+    rowSums(pseudobulk_counts),
+    decreasing = TRUE
 )[seq_len(20)]
 
 pseudobulk_metadata <- unique(as.data.frame(
-  SummarizedExperiment::colData(pseudobulk_input)[, c("sample_id", "group_id")]
+    SummarizedExperiment::colData(pseudobulk_input)[, c("sample_id",
+        "group_id")]
 ))
 rownames(pseudobulk_metadata) <- pseudobulk_metadata$sample_id
 pseudobulk_metadata <- pseudobulk_metadata[
-  colnames(pseudobulk_counts),
-  ,
-  drop = FALSE
+    colnames(pseudobulk_counts), ,
+    drop = FALSE
 ]
 pseudobulk_metadata$condition <- pseudobulk_metadata$group_id
 
 pseudobulk_se <- SummarizedExperiment::SummarizedExperiment(
-  assays = list(counts = pseudobulk_counts[top_pseudobulk_genes, , drop = FALSE]),
-  colData = pseudobulk_metadata
+    assays = list(counts = pseudobulk_counts[top_pseudobulk_genes, , drop =
+        FALSE]),
+    colData = pseudobulk_metadata
 )
 
 pseudobulk_fit <- Tweedieverse(
-  input_features = pseudobulk_se,
-  output = NULL,
-  assay_name = "counts",
-  domain = "bulk_rnaseq",
-  fixed_effects = c("condition"),
-  reference = "condition,ctrl",
-  tweedie_p = 1,
-  median_comparison = FALSE,
-  max_significance = 1
+    input_features = pseudobulk_se,
+    output = NULL,
+    assay_name = "counts",
+    domain = "bulk_rnaseq",
+    fixed_effects = c("condition"),
+    reference = "condition,ctrl",
+    tweedie_p = 1,
+    median_comparison = FALSE,
+    max_significance = 1
 )
 
 head(pseudobulk_fit)
@@ -480,27 +510,28 @@ results.
 data("airway", package = "airway")
 
 airway_counts <- SummarizedExperiment::assay(airway, "counts")
-top_airway_genes <- order(rowSums(airway_counts), decreasing = TRUE)[seq_len(20)]
+top_airway_genes <- order(rowSums(airway_counts), decreasing = TRUE)[seq_len(
+    20)]
 
 bulk_rnaseq_se <- SummarizedExperiment::SummarizedExperiment(
-  assays = list(counts = airway_counts[top_airway_genes, , drop = FALSE]),
-  colData = SummarizedExperiment::colData(airway)
+    assays = list(counts = airway_counts[top_airway_genes, , drop = FALSE]),
+    colData = SummarizedExperiment::colData(airway)
 )
 
 bulk_rnaseq_se
 
 bulk_rnaseq_fit <- Tweedieverse(
-  input_features = bulk_rnaseq_se,
-  output = NULL,
-  assay_name = "counts",
-  domain = "bulk_rnaseq",
-  fixed_effects = c("dex"),
-  reference = "dex,untrt",
-  tweedie_p = 1,
-  median_comparison = FALSE,
-  run_presence_absence_model = TRUE,
-  max_significance = 0.05,
-  return_all = TRUE
+    input_features = bulk_rnaseq_se,
+    output = NULL,
+    assay_name = "counts",
+    domain = "bulk_rnaseq",
+    fixed_effects = c("dex"),
+    reference = "dex,untrt",
+    tweedie_p = 1,
+    median_comparison = FALSE,
+    run_presence_absence_model = TRUE,
+    max_significance = 0.05,
+    return_all = TRUE
 )
 
 head(bulk_rnaseq_fit)
@@ -536,24 +567,24 @@ parameters can be supplied as named vectors or lists.
 franzosa_example_mae
 
 multi_fit <- Tweedieverse(
-  input_features = franzosa_example_mae,
-  output = NULL,
-  assay_name = "abundance",
-  domain = c(
-    taxaAbundanceProfile = "microbiome",
-    harmonizedMetaboliteProfile = "custom"
-  ),
-  normalization = c(
-    taxaAbundanceProfile = "NONE",
-    harmonizedMetaboliteProfile = "MEDIAN"
-  ),
-  fixed_effects = c("diseaseCat_clean", "Age"),
-  tweedie_p = list(
-    taxaAbundanceProfile = NULL,
-    harmonizedMetaboliteProfile = NULL
-  ),
-  median_comparison = FALSE,
-  max_significance = 1
+    input_features = franzosa_example_mae,
+    output = NULL,
+    assay_name = "abundance",
+    domain = c(
+        taxaAbundanceProfile = "microbiome",
+        harmonizedMetaboliteProfile = "custom"
+    ),
+    normalization = c(
+        taxaAbundanceProfile = "NONE",
+        harmonizedMetaboliteProfile = "MEDIAN"
+    ),
+    fixed_effects = c("diseaseCat_clean", "Age"),
+    tweedie_p = list(
+        taxaAbundanceProfile = NULL,
+        harmonizedMetaboliteProfile = NULL
+    ),
+    median_comparison = FALSE,
+    max_significance = 1
 )
 
 names(multi_fit)
@@ -563,13 +594,15 @@ head(multi_fit$harmonizedMetaboliteProfile)
 
 Each list element is a separate association table, and its `omics` column
 identifies the layer. `diseaseCat_clean` rows compare the named `value` with the
-reference disease category; `Age` rows describe a one-standard-deviation increase
+reference disease category; `Age` rows describe a one-standard-deviation
+increase
 because continuous predictors are standardized by default. Within either layer,
 a positive log-link coefficient means a higher fitted mean, conditional on the
 other covariate and offset. Taxon abundances and metabolite intensities have
 different measurement scales, so coefficients should be interpreted within
 layers. q-values are adjusted separately per layer, not across the entire
-multi-omics list. As above, `max_significance = 1` displays tests without requiring
+multi-omics list. As above, `max_significance = 1` displays tests without
+requiring
 a discovery threshold.
 
 

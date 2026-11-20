@@ -45,3 +45,12 @@ COPYRIGHT HOLDER: Harvard School of Public Health
 The MIT permission and warranty notice reproduced above applies to these
 MaAsLin2 example data as well. Preparation and original study attribution are
 recorded in inst/scripts/README.md and inst/extdata/DATA_LICENSES.md.
+
+Historical entropy source
+=========================
+
+The previous implementation was adapted from Philippe Jette (2019),
+"Entropy, Information Gain, and Data Exploration in R":
+https://rstudio-pubs-static.s3.amazonaws.com/455435_30729e265f7a4d049400d03a18e218db.html
+The current tweedie_entropy() uses a new direct implementation of Shannon's
+formula; the previous entropy and information-gain implementations were removed.

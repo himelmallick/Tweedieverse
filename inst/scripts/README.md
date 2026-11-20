@@ -5,7 +5,8 @@ Run this from the package source root.
     Rscript inst/scripts/rebuild_example_data.R
 
 The script requires the container packages listed in DESCRIPTION, Matrix,
-scran, and SeuratObject. SeuratObject is used only during preparation to read
+scran, and a separately installed copy of SeuratObject. SeuratObject is a
+manual preparation prerequisite, not a package dependency, and is used to read
 the published PBMC source object. The saved examples are Bioconductor
 containers. Loading the examples and running the vignette require no Seurat
 objects or downloads.
@@ -16,12 +17,13 @@ the combined tweedieverse_data.RData bundle for existing users. These files
 contain the same objects and have the same per-object licences.
 
 The optional arguments are an output directory, a cached HuMMANet RDS, and a
-cache directory containing the four other source files named below.
+cache directory containing the five other source files named below.
 
     Rscript inst/scripts/rebuild_example_data.R /tmp/examples /path/to/franzosae_2019.rds /path/to/cache
 
 Downloads are confined to this manual preparation script. The published PBMC
-object is approximately 274 MB, while the packaged subset is compact.
+object is approximately 274 MB. The Tabula Muris source archive is approximately
+304 MB; only its brain count table is extracted. The packaged subsets are compact.
 Every downloaded file is checked against its recorded MD5. The GitHub sources
 are pinned to revisions in the script. Subset selection is deterministic and
 uses category labels and count variance, without fitting association models.
@@ -69,26 +71,40 @@ the [Satija Lab PBMC3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tu
 
 ## Brain non-UMI example
 
-The source is brain_scRNAseq.rda from SC2P revision
-bdbb526cb81d598da99b63f55cc64c826863b954, MD5
-15562abf4745bc7aa8147f878b210fe9. It supplies the count matrix Y and sample
-annotations design used by the
-[TweedieLabs non-UMI tutorial](https://github.com/himelmallick/TweedieLabs/blob/master/R/Tweedieverse_scRNASeq_nonUMI.Rmd).
-The original study is Darmanis et al. (2015),
-[A survey of human brain transcriptome diversity at the single cell level](https://doi.org/10.1073/pnas.1507125112),
-GEO accession [GSE67835](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE67835).
+The replacement source is the original Tabula Muris Smart-seq2 FACS dataset,
+Figshare version 8, [DOI 10.6084/m9.figshare.5829687.v8](https://doi.org/10.6084/m9.figshare.5829687.v8).
+The record explicitly declares CC BY 4.0 for the deposited data and annotations.
+A copy of its metadata is in sources/tabula-muris-5829687-v8.json.
 
-Assign design row names as count column names and remove unused factor levels.
-Select the first 30 sorted cell IDs from each of astrocytes and oligodendrocytes.
-Compute SCRAN factors using all 10,483 genes in the retained cells, with cell
-classes as clusters and pool sizes 10 and 20. Retain the 20 genes with highest
-count variance. Store raw read counts, original design variables, and
-source_size_factor in nonumi_sce, a SingleCellExperiment.
+The pinned files are:
 
-SC2P declares GPL without specifying a version. Its dataset licence is recorded
-separately from the package's MIT code licence. A copy of GNU GPL version 2 is
-included in inst/extdata/SC2P-GPL-2.txt. Credit SC2P contributors Zhijin (Jean)
-Wu, Jamie (Yi) Zhang, and Hao Wu, and the original Darmanis et al. study.
+- FACS.zip, Figshare file 10700143, MD5
+  ef6e44ca2170155052591b5ab9d5d778.
+- annotations_facs.csv, Figshare file 13088129, MD5
+  8ba7b81d91fe569cea07c384c2d34912.
+
+Download URLs are https://ndownloader.figshare.com/files/10700143 and
+https://ndownloader.figshare.com/files/13088129. The script verifies both MD5s.
+Extract only FACS/Brain_Non-Myeloid-counts.csv from the archive. The source
+record describes these as gene-count tables from Smart-seq2, a full-length
+non-UMI protocol; these are not counts from the project's droplet assay.
+
+Filter annotations to Brain_Non-Myeloid and the cell ontology classes
+astrocyte and oligodendrocyte. Among mice with at least 30 cells in each class,
+choose the first sorted mouse ID (3_10_M), then the first 30 sorted cell IDs
+per class. Read those 60 columns from the count table, retaining all source
+genes. Compute SCRAN factors with the cell classes as clusters and pool sizes
+10 and 20. Select the 20 genes with highest count variance using the common
+variable_features() helper. Store unchanged source counts, the selected
+annotations, a celltype factor, source_size_factor, and source/licence metadata
+in nonumi_sce. This is an illustrative cell-type comparison within one mouse.
+
+Credit Tabula Muris Consortium, James Webber, Joshua Batson, and Angela Pisco
+(2018), the authors listed on the Figshare record, and cite the original study:
+Tabula Muris Consortium et al. (2018), "Single-cell transcriptomics of 20 mouse
+organs creates a Tabula Muris", https://doi.org/10.1038/s41586-018-0590-4.
+Redistribution retains attribution, the CC BY 4.0 licence link, and a description
+of subsetting and added size factors. No SC2P data are used in this example.
 
 ## Franzosa et al. data
 

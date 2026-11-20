@@ -5,16 +5,16 @@
 \title{Plot a Tweedieverse Heatmap}
 \usage{
 Tweedieverse_heatmap(
-  output_results,
-  title = NA,
-  cell_value = "qval",
-  data_label = "data",
-  metadata_label = "metadata",
-  border_color = "grey93",
-  color = colorRampPalette(c("darkblue", "grey90", "darkred")),
-  col_rotate = 90,
-  first_n = 50,
-  write_to = NA
+    output_results,
+    title = NA,
+    cell_value = "qval",
+    data_label = "data",
+    metadata_label = "metadata",
+    border_color = "grey93",
+    color = colorRampPalette(c("darkblue", "grey90", "darkred")),
+    col_rotate = 90,
+    first_n = 50,
+    write_to = NA
 )
 }
 \arguments{
@@ -47,12 +47,12 @@ results.
 }
 \examples{
 toy <- data.frame(
-  feature = c("tax1", "tax2", "tax1", "tax2"),
-  metadata = c("grp", "grp", "time", "time"),
-  value = c("A", "B", "A", "B"),
-  pval = c(0.01, 0.05, 0.02, 0.03),
-  qval = c(0.02, 0.08, 0.03, 0.04),
-  coef = c(1.2, -0.7, 0.9, -0.4)
+    feature = c("tax1", "tax2", "tax1", "tax2"),
+    metadata = c("grp", "grp", "time", "time"),
+    value = c("A", "B", "A", "B"),
+    pval = c(0.01, 0.05, 0.02, 0.03),
+    qval = c(0.02, 0.08, 0.03, 0.04),
+    coef = c(1.2, -0.7, 0.9, -0.4)
 )
 Tweedieverse_heatmap(toy, first_n = 2)
 }

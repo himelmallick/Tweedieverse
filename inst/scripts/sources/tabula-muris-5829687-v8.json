@@ -1,0 +1,248 @@
+{
+  "files": [
+    {
+      "id": 10700143,
+      "name": "FACS.zip",
+      "size": 303966623,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/10700143",
+      "supplied_md5": "ef6e44ca2170155052591b5ab9d5d778",
+      "computed_md5": "ef6e44ca2170155052591b5ab9d5d778",
+      "mimetype": "application/zip"
+    },
+    {
+      "id": 10842785,
+      "name": "metadata_FACS.csv",
+      "size": 10992,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/10842785",
+      "supplied_md5": "ace501ebb54e6674bc27065144134767",
+      "computed_md5": "ace501ebb54e6674bc27065144134767",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 13088129,
+      "name": "annotations_facs.csv",
+      "size": 6990328,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/13088129",
+      "supplied_md5": "8ba7b81d91fe569cea07c384c2d34912",
+      "computed_md5": "8ba7b81d91fe569cea07c384c2d34912",
+      "mimetype": "text/plain"
+    }
+  ],
+  "folder_structure": {},
+  "authors": [
+    {
+      "id": 4708546,
+      "full_name": "Tabula Muris Consortium",
+      "first_name": "Tabula Muris",
+      "last_name": "Consortium",
+      "is_active": false,
+      "url_name": "_",
+      "orcid_id": ""
+    },
+    {
+      "id": 4679245,
+      "full_name": "James Webber",
+      "first_name": "James",
+      "last_name": "Webber",
+      "is_active": true,
+      "url_name": "James_Webber",
+      "orcid_id": "0000-0001-8594-9888"
+    },
+    {
+      "id": 4692697,
+      "full_name": "Joshua Batson",
+      "first_name": "Joshua",
+      "last_name": "Batson",
+      "is_active": true,
+      "url_name": "Joshua_Batson",
+      "orcid_id": ""
+    },
+    {
+      "id": 5774327,
+      "full_name": "Angela Pisco",
+      "first_name": "Angela",
+      "last_name": "Pisco",
+      "is_active": false,
+      "url_name": "_",
+      "orcid_id": ""
+    }
+  ],
+  "custom_fields": [],
+  "figshare_url": "https://figshare.com/articles/dataset/Single-cell_RNA-seq_data_from_Smart-seq2_sequencing_of_FACS_sorted_cells_v2_/5829687",
+  "download_disabled": false,
+  "description": "<div>Gene-count tables for FACS sorted cells sequenced with Smart-Seq2 from 20 organs of 7 mice. Cells are grouped by tissue of origin.<br></div><div><br></div><div><div></div><div>Includes data for 53,760 cells, 44,879 of which passed a QC cutoff of at least 500 genes and 50,000 reads.</div></div><div><br></div><div><div>Cell annotations using the Cell Ontology [1] controlled vocabulary are in a separate csv.</div><div><br></div><div>This differs from v1 by renaming \"Brain_Neurons\" --> \"Brain_Non-microglia\" to be consistent with the manuscript.<br></div><div><br></div><div>Update 2018-09-20: Updated annotations to latest manuscript version</div><div><br></div><div>Update 2018-02-16: Separated Diaphragm cells from Muscle cells, and Aorta cells from Heart cells.</div><div><br></div><div>Update 2018-02-20: Aorta and Heart erroneously contained Diaphragm and Muscle data, and have now been corrected.</div><div><br></div><div>Update 2018-03-09: Renamed tissues for nomenclature standards: </div><div><ul><li> \"Colon\" --> \"Large_Intestine\"</li><li> \"Muscle\" --> \"Limb_Muscle\"</li><li> \"Mammary\" --> \"Mammary_Gland\"</li><li> \"Brain_Microglia\" --> \"Brain_Myeloid\"</li><li> \"Brain_Non-microglia\" --> \"Brain_Non-Myeloid\"</li></ul><div>Update 2018-03-22: Renamed subtissues:</div></div><div><br></div><div>- tissue: Heart, subtissue: ? --> tissue: Heart, subtissue: Unknown</div><div>- tissue: Skin, subtissue: NA --> tissue: Skin, subtissue: Telogen</div><div><br></div><div>Update 2018-03-23: Removed row numbers in first column of metadata_FACS.csv</div><div><br></div><div>Update 2018-03-27: Added tissue tSNEs and cluster ids</div><div><br></div><div><br></div><div>[1] http://purl.obolibrary.org/obo/cl.owl</div><div><br></div></div>",
+  "funding": "Chan Zuckerberg Biohub",
+  "funding_list": [
+    {
+      "id": 287813,
+      "title": "Chan Zuckerberg Biohub",
+      "grant_code": "",
+      "funder_name": null,
+      "is_user_defined": 1
+    }
+  ],
+  "version": 8,
+  "status": "public",
+  "size": 310967943,
+  "created_date": "2018-09-20T17:47:25Z",
+  "modified_date": "2023-05-30T12:48:35Z",
+  "is_public": true,
+  "is_confidential": false,
+  "is_metadata_record": false,
+  "confidential_reason": "",
+  "metadata_reason": "",
+  "license": {
+    "value": 1,
+    "name": "CC BY 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "tags": [
+    "Mus musculus",
+    "rna-seq",
+    "single-cell rna-seq",
+    "single-cell RNA-seq",
+    "aorta",
+    "bladder",
+    "brain",
+    "microglia",
+    "neuron",
+    "colon",
+    "diaphragm",
+    "fat",
+    "heart",
+    "kidney",
+    "liver",
+    "lung",
+    "mammary",
+    "marrow",
+    "muscle",
+    "pancreas",
+    "skin",
+    "thymus",
+    "tongue",
+    "trachea",
+    "limb muscle",
+    "mammary gland",
+    "large intestine",
+    "brain myeloid",
+    "brain non-myeloid",
+    "Animal Cell and Molecular Biology",
+    "Bioinformatics",
+    "Cell Biology",
+    "Molecular Biology"
+  ],
+  "keywords": [
+    "Mus musculus",
+    "rna-seq",
+    "single-cell rna-seq",
+    "single-cell RNA-seq",
+    "aorta",
+    "bladder",
+    "brain",
+    "microglia",
+    "neuron",
+    "colon",
+    "diaphragm",
+    "fat",
+    "heart",
+    "kidney",
+    "liver",
+    "lung",
+    "mammary",
+    "marrow",
+    "muscle",
+    "pancreas",
+    "skin",
+    "thymus",
+    "tongue",
+    "trachea",
+    "limb muscle",
+    "mammary gland",
+    "large intestine",
+    "brain myeloid",
+    "brain non-myeloid",
+    "Animal Cell and Molecular Biology",
+    "Bioinformatics",
+    "Cell Biology",
+    "Molecular Biology"
+  ],
+  "categories": [
+    {
+      "id": 24403,
+      "title": "Animal cell and molecular biology",
+      "parent_id": 24397,
+      "path": "/24130/24397/24403",
+      "source_id": "310902",
+      "taxonomy_id": 100
+    },
+    {
+      "id": 24208,
+      "title": "Bioinformatics and computational biology not elsewhere classified",
+      "parent_id": 24181,
+      "path": "/24130/24181/24208",
+      "source_id": "310299",
+      "taxonomy_id": 100
+    },
+    {
+      "id": 24178,
+      "title": "Biochemistry and cell biology not elsewhere classified",
+      "parent_id": 24133,
+      "path": "/24130/24133/24178",
+      "source_id": "310199",
+      "taxonomy_id": 100
+    },
+    {
+      "id": 24382,
+      "title": "Plant cell and molecular biology",
+      "parent_id": 24373,
+      "path": "/24130/24373/24382",
+      "source_id": "310803",
+      "taxonomy_id": 100
+    }
+  ],
+  "references": [
+    "https://doi.org/10.1038/s41586-018-0590-4"
+  ],
+  "has_linked_file": false,
+  "citation": "Consortium, Tabula Muris; Webber, James; Batson, Joshua; Pisco, Angela (2018). Single-cell RNA-seq data from Smart-seq2 sequencing of FACS sorted cells (v2). figshare. Dataset. https://doi.org/10.6084/m9.figshare.5829687.v8",
+  "related_materials": [
+    {
+      "id": 1035983,
+      "identifier": "https://doi.org/10.1038/s41586-018-0590-4",
+      "title": "",
+      "relation": "References",
+      "identifier_type": "URL",
+      "is_linkout": false,
+      "link": "https://doi.org/10.1038/s41586-018-0590-4"
+    }
+  ],
+  "is_embargoed": false,
+  "embargo_date": null,
+  "embargo_type": "file",
+  "embargo_title": "",
+  "embargo_reason": "",
+  "embargo_options": [],
+  "id": 5829687,
+  "title": "Single-cell RNA-seq data from Smart-seq2 sequencing of FACS sorted cells (v2)",
+  "doi": "10.6084/m9.figshare.5829687.v8",
+  "handle": "",
+  "url": "https://api.figshare.com/v2/articles/5829687",
+  "published_date": "2018-09-20T17:47:25Z",
+  "thumb": "",
+  "defined_type": 3,
+  "defined_type_name": "dataset",
+  "group_id": null,
+  "url_private_api": "https://api.figshare.com/v2/account/articles/5829687",
+  "url_public_api": "https://api.figshare.com/v2/articles/5829687",
+  "url_private_html": "https://figshare.com/account/articles/5829687",
+  "url_public_html": "https://figshare.com/articles/dataset/Single-cell_RNA-seq_data_from_Smart-seq2_sequencing_of_FACS_sorted_cells_v2_/5829687",
+  "timeline": {
+    "posted": "2018-09-20T17:47:25",
+    "firstOnline": "2018-09-20"
+  },
+  "resource_title": null,
+  "resource_doi": null
+}

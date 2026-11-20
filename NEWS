@@ -1,3 +1,38 @@
+Changes in version 0.99.2 (2026-11-20):
+* Split .Tweedieverse_single() into a short function and explicit
+  helpers for validation, input extraction, sample alignment, reference levels,
+  filtering, variance-power resolution, offsets, formulas, fitting, result
+  summaries, median comparison, prevalence tests, output files, and plots.
+  Preserve the public interface and scoped logging cleanup.
+* Apply styler and consistent four-space indentation to R code, tests, and
+  preparation scripts. Wrap long code and documentation lines, normalize line
+  endings, and preserve condition messages without paste calls in signals.
+* Regenerate and format function documentation and record the current roxygen2
+  version used for generation.
+* Correct the motivation's spelling and model descriptions, remove the
+  unsupported benchmark/power claim, and use the verified MaAsLin3 Bioconductor
+  package link. Format the vignette's code and result-column explanations.
+* Replace the SC2P-derived non-UMI data in both nonumi_sce.rds and the combined
+  tweedieverse_data.RData bundle with original Tabula Muris Smart-seq2 brain
+  counts and annotations explicitly licensed CC BY 4.0. Retain 20 genes and
+  60 cells, balanced between astrocytes and oligodendrocytes from one mouse.
+* Pin the replacement's original Figshare version, file identifiers, and MD5
+  checksums. Include the source metadata record and attribution, and record the
+  licence, protocol, source identifiers, and processing in the example object.
+  Calculate SCRAN factors from all source genes before selecting bundled genes.
+* Update the data preparation script, provenance and licence documentation,
+  vignette source description, factor reference, and interpretation for the
+  replacement dataset. Remove the superseded SC2P GPL-2 notice.
+* Extend bundled-data tests to check the replacement's mouse, cell types,
+  non-negative integer counts, source DOI, protocol, and explicit data licence.
+* Remove SeuratObject from Suggests and document it as a separately installed
+  prerequisite used only by the manual PBMC preparation script.
+* Retain historical entropy-source attribution and move its full source URL
+  into inst/COPYRIGHTS while keeping source lines within the width convention.
+* Clarify that .gitignore excludes .DS_Store at every directory level and
+  extend .Rbuildignore to exclude nested .DS_Store files. Verify that no such
+  files are tracked and that docs/ remains excluded from package builds.
+
 Changes in version 0.99.1 (2026-11-18):
 * Keep zero-row MultiAssayExperiment result tables when a layer has no
   significant associations, preserving the other layers and output columns.

@@ -10,7 +10,7 @@ nonumi_sce.rds, and franzosa_example_mae.rds), under the same licence.
 | --- | --- | --- |
 | microbiome_tse | HMP2 baseline data distributed with MaAsLin2 | MIT, copyright 2018 Harvard School of Public Health |
 | umi_sce | 10x PBMC3k raw counts with published Satija Lab cell labels | CC BY 4.0 for the 10x counts |
-| nonumi_sce | SC2P brain count data, GEO GSE67835 | GPL, as declared by SC2P |
+| nonumi_sce | Tabula Muris Smart-seq2 FACS brain counts, Figshare v8 | CC BY 4.0 |
 | franzosa_example_mae | A subset of the HuMMANet v1 FranzosaE_2019 data | CC BY 4.0 |
 
 ## FransozaE_2019_MAE.RData
@@ -51,12 +51,23 @@ attributed to the Satija Lab PBMC3k tutorial and the processed object linked in
 inst/scripts/README.md. The package subset retains raw counts, selects CD4/CD8
 cells, and calculates full-library sizes before gene selection.
 
-The non-UMI counts are distributed in the GPL-licensed SC2P package by Zhijin
-(Jean) Wu, Jamie (Yi) Zhang, and Hao Wu. SC2P's DESCRIPTION declares GPL without
-a version number. GNU GPL version 2 is included in SC2P-GPL-2.txt. Credit
-Darmanis et al. (2015), https://doi.org/10.1073/pnas.1507125112, and GSE67835.
-The package subset selects astrocytes and oligodendrocytes and calculates SCRAN
-factors before selecting genes.
+The non-UMI example is a subset of the original Tabula Muris Smart-seq2 FACS
+count tables and annotations, Figshare version 8:
+https://doi.org/10.6084/m9.figshare.5829687.v8.
+The original record explicitly declares CC BY 4.0 for these deposited files.
+The source metadata snapshot is in
+inst/scripts/sources/tabula-muris-5829687-v8.json; its licence URL is
+https://creativecommons.org/licenses/by/4.0/.
+
+Credit the record's authors: Tabula Muris Consortium, James Webber, Joshua Batson,
+and Angela Pisco (2018). Cite Tabula Muris Consortium et al. (2018), "Single-cell
+transcriptomics of 20 mouse organs creates a Tabula Muris",
+https://doi.org/10.1038/s41586-018-0590-4.
+The package subset retains 30 astrocytes and 30 oligodendrocytes from mouse
+3_10_M, selects 20 genes by count variance, and adds SCRAN factors calculated
+before gene selection. Raw source count values are unchanged. The cells come
+from the FACS Smart-seq2 assay, not the droplet assay. The counts and annotations
+retain CC BY 4.0, separately from the package code's MIT licence.
 
 The package's MIT licence applies to its code. The bundled data objects retain
 the source-specific licences listed above. Full source URLs, revision IDs,

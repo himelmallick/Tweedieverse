@@ -1,30 +1,51 @@
 Package: Tweedieverse
 Title: Differential Analysis of Omics Data Based on the Tweedie Distribution
-Version: 0.99.1
-Date: 2026-11-18
+Version: 0.99.2
+Date: 2026-11-20
 Authors@R: c(
-  person("Nalin", "Arora", email = "naa4050@med.cornell.edu", role = c("aut", "cre"), comment = c(ORCID = "0009-0009-1340-688X")),
-  person("Ziyu", "Liu", email = "lclcencen@gmail.com", role = "ctb"),
-  person("Ali", "Rahnavard", email = "gholamali.rahnavard@gmail.com", role = c("ctb", "cph"), comment = c(ORCID = "0000-0002-9710-0248")),
-  person("Himel", "Mallick", email = "him4004@med.cornell.edu", role = c("aut", "cph"), comment = c(ORCID = "0000-0003-4956-2429")),
-  person("William", "Nickols", role = "ctb", comment = "MaAsLin 3 median-comparison code"),
-  person("Jacob", "Nearing", role = "ctb", comment = "MaAsLin 3 median-comparison code"),
-  person("Harvard School of Public Health", role = "cph", comment = "MaAsLin 3 components")
-  )
-Description: A toolkit for differential analysis of omics data. Implements a CPLM-based statistical workflow built on the Tweedie distribution. Unlike traditional single-omics tools, Tweedieverse is technology-agnostic and can be applied to both count and continuous measurements arising from diverse high-throughput technologies (e.g. transcript abundances from bulk and single-cell RNA-Seq studies in the form of UMI counts or non-UMI counts, microbiome taxonomic and functional profiles in the form of counts or relative abundances, and compound abundance levels or peak intensities from metabolomics and other mass spectrometry-based experiments, among others). The software includes multiple customization options such as the inclusion of random effects and multiple covariates along with several data exploration capabilities and visualization modules in a unified estimation umbrella.
+    person("Nalin", "Arora", email = "naa4050@med.cornell.edu", role = c(
+        "aut", "cre"), comment = c(ORCID = "0009-0009-1340-688X")),
+    person("Ziyu", "Liu", email = "lclcencen@gmail.com", role = "ctb"),
+    person("Ali", "Rahnavard", email = "gholamali.rahnavard@gmail.com", role =
+        c("ctb", "cph"), comment = c(ORCID = "0000-0002-9710-0248")),
+    person("Himel", "Mallick", email = "him4004@med.cornell.edu", role = c(
+        "aut", "cph"), comment = c(ORCID = "0000-0003-4956-2429")),
+    person("William", "Nickols", role = "ctb", comment =
+        "MaAsLin 3 median-comparison code"),
+    person("Jacob", "Nearing", role = "ctb", comment =
+        "MaAsLin 3 median-comparison code"),
+    person("Harvard School of Public Health", role = "cph", comment =
+        "MaAsLin 3 components")
+    )
+Description: A toolkit for differential analysis of omics data. Implements a
+    CPLM-based statistical workflow built on the Tweedie distribution. Unlike
+    traditional single-omics tools, Tweedieverse is technology-agnostic and
+    can be applied to both count and continuous measurements arising from
+    diverse high-throughput technologies (e.g. transcript abundances from bulk
+    and single-cell RNA-Seq studies in the form of UMI counts or non-UMI
+    counts, microbiome taxonomic and functional profiles in the form of counts
+    or relative abundances, and compound abundance levels or peak intensities
+    from metabolomics and other mass spectrometry-based experiments, among
+    others). The software includes multiple customization options such as the
+    inclusion of random effects and multiple covariates along with several
+    data exploration capabilities and visualization modules in a unified
+    estimation umbrella.
 Depends: R (>= 4.6.0)
-Imports: cplm, glmmTMB, BiocParallel, logging, dplyr, ggplot2, pheatmap, cowplot, SummarizedExperiment, statmod, Maaslin2, edgeR, scran, SingleCellExperiment, TreeSummarizedExperiment, MultiAssayExperiment, Matrix, withr
-Suggests: airway, data.table, knitr, rmarkdown, BiocStyle, muscat, testthat, SeuratObject
+Imports: cplm, glmmTMB, BiocParallel, logging, dplyr, ggplot2, pheatmap,
+    cowplot, SummarizedExperiment, statmod, Maaslin2, edgeR, scran,
+    SingleCellExperiment, TreeSummarizedExperiment, MultiAssayExperiment,
+    Matrix, withr
+Suggests: airway, data.table, knitr, rmarkdown, BiocStyle, muscat, testthat
 License: MIT + file LICENSE
 Copyright: MaAsLin 3 median-comparison components are copyright 2025 Harvard
     School of Public Health and distributed under the MIT license.
     See inst/COPYRIGHTS for the upstream notice.
 Encoding: UTF-8
-RoxygenNote: 7.3.3
 VignetteBuilder: knitr
 URL: https://github.com/himelmallick/Tweedieverse
 BugReports: https://github.com/himelmallick/Tweedieverse/issues
 biocViews: DifferentialExpression, Software, Visualization, CellBasedAssays,
-  ATACSeq, Microbiome, MassSpectrometry, SingleCell, Metabolomics,
-  Metagenomics, WorkflowStep, MultipleComparison, Normalization, Regression,
-  RNASeq
+    ATACSeq, Microbiome, MassSpectrometry, SingleCell, Metabolomics,
+    Metagenomics, WorkflowStep, MultipleComparison, Normalization, Regression,
+    RNASeq
+Config/roxygen2/version: 8.1.1

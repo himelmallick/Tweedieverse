@@ -1,66 +1,60 @@
-get_AICtab<-function(fit){
-  
-  ########################
-  # Flag invalid options #
-  ########################
-  
-  if (!inherits(fit, c("cpglm", "glmmTMB"))) {
-    stop('Not supported. Valid options are cpglm and glmmTMB')
-  }
-  
-  ######################
-  #  Initialize AICtab #
-  ######################
-  
-  AICtab<-rep(NA, 5)
-  
-  ###########################
-  # Case-by-Case Extraction #
-  ###########################
-  
-  if (inherits(fit, "cpglm")) {
-    
-    ##########################################
-    # Back calculate logLik and BIC from AIC #
-    ##########################################
-    
-    AIC<-fit$aic
-    AIC_multiplier<-length(fit$y) - fit$df.residual
-    logLik<-(AIC - 2*AIC_multiplier)/2
-    BIC_multiplier<-AIC_multiplier*log(length(fit$y))
-    BIC<-BIC_multiplier + 2*logLik
-    deviance<-fit$deviance
-    df.resid<-fit$df.residual
-    
-    # Coherent output
-    AICtab<-c(AIC, BIC, logLik, deviance, df.resid)
-  }
-  
-  if (inherits(fit, "glmmTMB")) {
-    
-    #######################################
-    # Extract AICtab from glmmTMB objects #
-    #######################################
-    
-    AICtab<-summary(fit)["AICtab"]$AICtab
-    
-  }
-  
-  ##########
-  # Return #
-  ##########
-  
-  names(AICtab)<-c('AIC', 'BIC', 'logLik', 'deviance', 'df.resid')
-  return(AICtab)
+get_AICtab <- function(fit) {
+    ########################
+    # Flag invalid options #
+    ########################
+
+    if (!inherits(fit, c("cpglm", "glmmTMB"))) {
+        stop("Not supported. Valid options are cpglm and glmmTMB")
+    }
+
+    ######################
+    #  Initialize AICtab #
+    ######################
+
+    AICtab <- rep(NA, 5)
+
+    ###########################
+    # Case-by-Case Extraction #
+    ###########################
+
+    if (inherits(fit, "cpglm")) {
+        ##########################################
+        # Back calculate logLik and BIC from AIC #
+        ##########################################
+
+        AIC <- fit$aic
+        AIC_multiplier <- length(fit$y) - fit$df.residual
+        logLik <- (AIC - 2 * AIC_multiplier) / 2
+        BIC_multiplier <- AIC_multiplier * log(length(fit$y))
+        BIC <- BIC_multiplier + 2 * logLik
+        deviance <- fit$deviance
+        df.resid <- fit$df.residual
+
+        # Coherent output
+        AICtab <- c(AIC, BIC, logLik, deviance, df.resid)
+    }
+
+    if (inherits(fit, "glmmTMB")) {
+        #######################################
+        # Extract AICtab from glmmTMB objects #
+        #######################################
+
+        AICtab <- summary(fit)["AICtab"]$AICtab
+    }
+
+    ##########
+    # Return #
+    ##########
+
+    names(AICtab) <- c("AIC", "BIC", "logLik", "deviance", "df.resid")
+    return(AICtab)
 }
-
-
 
 
 # Historical note: the previous entropy and information-gain implementation
 # was adapted from Philippe Jette (2019), "Entropy, Information Gain, and
 # Data Exploration in R":
-# https://rstudio-pubs-static.s3.amazonaws.com/455435_30729e265f7a4d049400d03a18e218db.html
+# Historical source URL: see inst/COPYRIGHTS.
 # The entropy function below is a new implementation of Shannon's formula.
 
 #' Entropy of a Vector
@@ -79,609 +73,689 @@ get_AICtab<-function(fit){
 #' tweedie_entropy(c("A", "A", "B", "B", "C"))
 #' @export
 tweedie_entropy <- function(target) {
-  observed <- as.character(target[!is.na(target)])
-  categories <- unique(observed)
-  category_counts <- tabulate(match(observed, categories), nbins = length(categories))
-  probabilities <- category_counts / length(target)
-  sum(probabilities * log2(1 / probabilities))
+    observed <- as.character(target[!is.na(target)])
+    categories <- unique(observed)
+    category_counts <- tabulate(match(observed, categories), nbins = length(
+        categories))
+    probabilities <- category_counts / length(target)
+    sum(probabilities * log2(1 / probabilities))
 }
 
 merge_method_args <- function(defaults, overrides) {
-  if (is.null(overrides)) {
-    return(defaults)
-  }
-  if (!is.list(overrides)) {
-    stop("Method-specific arguments must be provided as a list.")
-  }
-  utils::modifyList(defaults, overrides, keep.null = TRUE)
+    if (is.null(overrides)) {
+        return(defaults)
+    }
+    if (!is.list(overrides)) {
+        stop("Method-specific arguments must be provided as a list.")
+    }
+    utils::modifyList(defaults, overrides, keep.null = TRUE)
 }
 
 extract_method_args <- function(method_args, method) {
-  if (is.null(method_args)) {
-    return(list())
-  }
-  if (!is.list(method_args)) {
-    stop("method_args must be NULL or a named list.")
-  }
-
-  candidates <- c(method, tolower(method))
-  for (candidate in candidates) {
-    if (!is.null(method_args[[candidate]])) {
-      if (!is.list(method_args[[candidate]])) {
-        stop(sprintf("method_args$%s must be a list.", candidate))
-      }
-      return(method_args[[candidate]])
+    if (is.null(method_args)) {
+        return(list())
     }
-  }
+    if (!is.list(method_args)) {
+        stop("method_args must be NULL or a named list.")
+    }
 
-  list()
+    candidates <- c(method, tolower(method))
+    for (candidate in candidates) {
+        if (!is.null(method_args[[candidate]])) {
+            if (!is.list(method_args[[candidate]])) {
+                stop(sprintf("method_args$%s must be a list.", candidate))
+            }
+            return(method_args[[candidate]])
+        }
+    }
+
+    list()
 }
 
 parse_effect_names <- function(effects) {
-  if (is.null(effects)) {
-    return(NULL)
-  }
+    if (is.null(effects)) {
+        return(NULL)
+    }
 
-  effects <- as.character(effects)
-  if (any(grepl(",", effects, fixed = TRUE))) {
-    stop(
-      "fixed_effects and random_effects must be character vectors. ",
-      "Use c(\"diagnosis\", \"antibiotics\") instead of \"diagnosis,antibiotics\"."
-    )
-  }
-  effects <- trimws(effects)
-  effects[nzchar(effects)]
+    effects <- as.character(effects)
+    if (any(grepl(",", effects, fixed = TRUE))) {
+        stop("fixed_effects and random_effects must be character vectors. ",
+            "Use c(\"diagnosis\", \"antibiotics\") ",
+                "instead of \"diagnosis,antibiotics\".")
+    }
+    effects <- trimws(effects)
+    effects[nzchar(effects)]
 }
 
 p0_transform_features <- function(features,
-                                  transform = "NONE",
-                                  pseudocount = 1) {
-  transform <- toupper(transform)
-  if (transform == "NONE") {
-    return(features)
-  }
+    transform = "NONE",
+    pseudocount = 1) {
+    transform <- toupper(transform)
+    if (transform == "NONE") {
+        return(features)
+    }
 
-  x <- as.matrix(features)
-  storage.mode(x) <- "numeric"
-  if (any(!is.finite(x), na.rm = TRUE)) {
-    stop("p0_transform requires finite feature values.")
-  }
+    x <- as.matrix(features)
+    storage.mode(x) <- "numeric"
+    if (any(!is.finite(x), na.rm = TRUE)) {
+        stop("p0_transform requires finite feature values.")
+    }
 
-  if (transform == "CLR") {
-    if (any(x < 0, na.rm = TRUE)) {
-      stop("CLR transformation requires non-negative feature values.")
-    }
-    if (pseudocount <= 0) {
-      stop("CLR transformation requires p0_transform_pseudocount > 0.")
-    }
-    z <- log(x + pseudocount)
-    z <- sweep(z, 1, rowMeans(z, na.rm = TRUE), "-")
-  } else if (transform == "RCLR") {
-    if (any(x < 0, na.rm = TRUE)) {
-      stop("RCLR transformation requires non-negative feature values.")
-    }
-    z <- t(apply(x, 1, function(row) {
-      positive <- row > 0
-      if (!any(positive)) {
-        stop("RCLR transformation requires at least one positive feature per sample.")
-      }
-      out <- rep(0, length(row))
-      logged <- log(row[positive])
-      out[positive] <- logged - mean(logged)
-      out
-    }))
-  } else if (transform == "LOG") {
-    if (any(x + pseudocount <= 0, na.rm = TRUE)) {
-      stop("LOG transformation requires feature values + p0_transform_pseudocount to be strictly positive.")
-    }
-    z <- log(x + pseudocount)
-  } else if (transform == "ARC_SIGNED_SQRT") {
-    z <- sign(x) * sqrt(abs(x))
-  } else {
-    stop(sprintf("Unsupported p0_transform: %s", transform))
-  }
+    if (transform == "CLR") {
+        if (any(x < 0, na.rm = TRUE)) {
+            stop("CLR transformation requires non-negative feature values.")
+        }
+        if (pseudocount <= 0) {
+            stop("CLR transformation requires p0_transform_pseudocount > 0.")
+        }
+        z <- log(x + pseudocount)
+        z <- sweep(z, 1, rowMeans(z, na.rm = TRUE), "-")
+    } else if (transform == "RCLR") {
+        if (any(x < 0, na.rm = TRUE)) {
+            stop("RCLR transformation requires non-negative feature values.")
+        }
+        z <- t(apply(x, 1, function(row) {
+            positive <- row > 0
+            if (!any(positive)) {
+                stop("RCLR transformation requires at least ",
+                    "one positive feature per sample.")
 
-  z <- as.data.frame(z)
-  rownames(z) <- rownames(features)
-  colnames(z) <- colnames(features)
-  z
+            }
+            out <- rep(0, length(row))
+            logged <- log(row[positive])
+            out[positive] <- logged - mean(logged)
+            out
+        }))
+    } else if (transform == "LOG") {
+        if (any(x + pseudocount <= 0, na.rm = TRUE)) {
+            stop("LOG transformation requires feature ",
+                "values + p0_transform_pseudocount to be ",
+                "strictly positive.")
+        }
+        z <- log(x + pseudocount)
+    } else if (transform == "ARC_SIGNED_SQRT") {
+        z <- sign(x) * sqrt(abs(x))
+    } else {
+        stop(sprintf("Unsupported p0_transform: %s", transform))
+    }
+
+    z <- as.data.frame(z)
+    rownames(z) <- rownames(features)
+    colnames(z) <- colnames(features)
+    z
 }
 
 domain_bioc_container_map <- function() {
-  list(
-    microbiome = c("TreeSummarizedExperiment", "SummarizedExperiment"),
-    single_cell = c("SingleCellExperiment"),
-    bulk_rnaseq = c("SummarizedExperiment"),
-    custom = c(
-      "SummarizedExperiment",
-      "SingleCellExperiment",
-      "TreeSummarizedExperiment"
+    list(
+        microbiome = c("TreeSummarizedExperiment", "SummarizedExperiment"),
+        single_cell = c("SingleCellExperiment"),
+        bulk_rnaseq = c("SummarizedExperiment"),
+        custom = c(
+            "SummarizedExperiment",
+            "SingleCellExperiment",
+            "TreeSummarizedExperiment"
+        )
     )
-  )
 }
 
 validate_domain_bioc_container <- function(input, domain) {
-  allowed <- domain_bioc_container_map()[[domain]]
-  if (is.null(allowed)) {
-    stop(sprintf("Unknown domain: %s", domain))
-  }
+    allowed <- domain_bioc_container_map()[[domain]]
+    if (is.null(allowed)) {
+        stop(sprintf("Unknown domain: %s", domain))
+    }
 
-  if (!inherits(input, allowed)) {
-    stop(
-      sprintf(
-        "For domain = %s, Bioconductor input must inherit from one of: %s. Plain data frames, matrices, lists, and file paths are not supported as input_features.",
-        domain,
-        paste(allowed, collapse = ", ")
-      )
-    )
-  }
-  invisible(TRUE)
+    if (!inherits(input, allowed)) {
+        {
+            condition_message1 <- paste0("For domain = %s, Bioconductor input ",
+
+                "must inherit from one of: %s. Plain ",
+                    "data frames, matrices, lists, and file ",
+                "paths are not supported as ", "input_features.")
+            stop(sprintf(condition_message1, domain, paste(allowed, collapse =
+                ", ")))
+        }
+    }
+    invisible(TRUE)
 }
 
 extractAssay <- function(input, assay_name = "counts") {
-  
-  # Extract assay name based on the user input
-  if (assay_name %in% SummarizedExperiment::assayNames(input)) {
-    counts_data <- SummarizedExperiment::assay(input, assay_name)
-    message("The specified assay has been extracted")
-    return(counts_data)
-  } else {
-    stop(sprintf(
-      "Assay '%s' was not found. Available assays: %s.",
-      assay_name, paste(SummarizedExperiment::assayNames(input), collapse = ", ")
-    ))
-  }
+    # Extract assay name based on the user input
+    if (assay_name %in% SummarizedExperiment::assayNames(input)) {
+        counts_data <- SummarizedExperiment::assay(input, assay_name)
+        message("The specified assay has been extracted")
+        return(counts_data)
+    } else {
+        stop(sprintf(
+            "Assay '%s' was not found. Available assays: %s.",
+            assay_name, paste(SummarizedExperiment::assayNames(input),
+                collapse = ", ")
+        ))
+    }
 }
 
 is_multiassay_experiment <- function(input) {
-  inherits(input, "MultiAssayExperiment")
+    inherits(input, "MultiAssayExperiment")
 }
 
 extract_multiassay_experiments <- function(input) {
-  if (!requireNamespace("MultiAssayExperiment", quietly = TRUE)) {
-    stop(
-      "MultiAssayExperiment input requires the MultiAssayExperiment package. ",
-      "Please install it or provide a single-omics input."
-    )
-  }
-  experiments <- MultiAssayExperiment::experiments(input)
-  if (length(experiments) == 0L) {
-    stop("MultiAssayExperiment input must contain at least one experiment.")
-  }
-  experiments
+    if (!requireNamespace("MultiAssayExperiment", quietly = TRUE)) {
+        stop("MultiAssayExperiment input requires the ",
+            "MultiAssayExperiment package. ",
+            "Please install it or provide a single-omics input.")
+    }
+    experiments <- MultiAssayExperiment::experiments(input)
+    if (length(experiments) == 0L) {
+        stop("MultiAssayExperiment input must contain ",
+            "at least one experiment.")
+
+    }
+    experiments
 }
 
 extract_multiassay_metadata <- function(input, input_metadata = NULL) {
-  if (!is.null(input_metadata)) {
-    return(input_metadata)
-  }
-  metadata <- as.data.frame(SummarizedExperiment::colData(input))
-  if (nrow(metadata) == 0L) {
-    stop(
-      "MultiAssayExperiment input needs sample metadata. ",
-      "Provide input_metadata or populate colData(input_features)."
-    )
-  }
-  metadata
+    if (!is.null(input_metadata)) {
+        return(input_metadata)
+    }
+    metadata <- as.data.frame(SummarizedExperiment::colData(input))
+    if (nrow(metadata) == 0L) {
+        stop(
+            "MultiAssayExperiment input needs sample metadata. ",
+            "Provide input_metadata or populate colData(input_features)."
+        )
+    }
+    metadata
 }
 
 coerce_multiassay_experiment_input <- function(experiment) {
-  valid_classes <- unique(unlist(domain_bioc_container_map()))
-  if (inherits(experiment, valid_classes)) {
-    return(experiment)
-  }
-  stop(
-    sprintf(
-      "MultiAssayExperiment experiment of class <%s> is not supported. Use domain-appropriate Bioconductor experiments only.",
-      class(experiment)[1]
-    )
-  )
+    valid_classes <- unique(unlist(domain_bioc_container_map()))
+    if (inherits(experiment, valid_classes)) {
+        return(experiment)
+    }
+    {
+        condition_message1 <- paste0("MultiAssayExperiment experiment of ",
+            "class <%s> is not supported. Use ",
+                "domain-appropriate Bioconductor ",
+            "experiments only.")
+        stop(sprintf(condition_message1, class(experiment)[1]))
+    }
 }
 
 resolve_multiomics_arg <- function(value,
-                                   omics_name,
-                                   omics_names,
-                                   arg_name,
-                                   allow_null_element = TRUE) {
-  if (is.null(value)) {
-    return(NULL)
-  }
+    omics_name,
+    omics_names,
+    arg_name,
+    allow_null_element = TRUE) {
+    if (is.null(value)) {
+        return(NULL)
+    }
 
-  if (is.list(value)) {
+    if (is.list(value)) {
+        value_names <- names(value)
+        if (!is.null(value_names) && omics_name %in% value_names) {
+            return(value[[omics_name]])
+        }
+        if (!is.null(value_names) && any(value_names %in% omics_names)) {
+            if (allow_null_element) {
+                return(NULL)
+            }
+            stop(sprintf("No value supplied for %s in omics layer %s.",
+                arg_name, omics_name))
+        }
+        if (is.null(value_names) && length(value) == length(omics_names)) {
+            return(value[[match(omics_name, omics_names)]])
+        }
+        return(value)
+    }
+
     value_names <- names(value)
     if (!is.null(value_names) && omics_name %in% value_names) {
-      return(value[[omics_name]])
+        return(unname(value[[omics_name]]))
     }
     if (!is.null(value_names) && any(value_names %in% omics_names)) {
-      if (allow_null_element) {
-        return(NULL)
-      }
-      stop(sprintf("No value supplied for %s in omics layer %s.", arg_name, omics_name))
+        stop(sprintf("No value supplied for %s in omics layer %s.", arg_name,
+            omics_name))
     }
-    if (is.null(value_names) && length(value) == length(omics_names)) {
-      return(value[[match(omics_name, omics_names)]])
-    }
-    return(value)
-  }
 
-  value_names <- names(value)
-  if (!is.null(value_names) && omics_name %in% value_names) {
-    return(unname(value[[omics_name]]))
-  }
-  if (!is.null(value_names) && any(value_names %in% omics_names)) {
-    stop(sprintf("No value supplied for %s in omics layer %s.", arg_name, omics_name))
-  }
-
-  value
+    value
 }
 
 run_multiassay_tweedieverse <- function(input_features,
-                                        input_metadata = NULL,
-                                        output = NULL,
-                                        assay_name = "counts",
-                                        abd_threshold = 0.0,
-                                        prev_threshold = 0.1,
-                                        var_threshold = 0.0,
-                                        entropy_threshold = 0.0,
-                                        base_model = "CPLM",
-                                        link = "log",
-                                        tweedie_p = NULL,
-                                        p0_transform = "NONE",
-                                        p0_transform_pseudocount = 1,
-                                        fixed_effects = NULL,
-                                        random_effects = NULL,
-                                        domain = "microbiome",
-                                        normalization = NULL,
-                                        adjust_offset = TRUE,
-                                        scale_factor = NULL,
-                                        max_significance = 0.05,
-                                        correction = "BH",
-                                        Maaslin2_run = TRUE,
-                                        median_comparison = FALSE,
-                                        median_subtraction = FALSE,
-                                        run_presence_absence_model = FALSE,
-                                        method_args = NULL,
-                                        method.args = NULL,
-                                        standardize = TRUE,
-                                        BPPARAM = BiocParallel::SerialParam(),
-                                        optimizer = "nlminb",
-                                        na.action = na.exclude,
-                                        plot_heatmap = FALSE,
-                                        plot_scatter = FALSE,
-                                        heatmap_first_n = 50,
-                                        reference = NULL,
-                                        min_presence_absence_count = 3L,
-                                        return_all = FALSE,
-                                        median_comparison_seed = NULL) {
-  if (!is.null(method_args) && !is.null(method.args)) {
-    stop("Please provide only one of method_args or method.args.")
-  }
-  if (is.null(method_args)) {
-    method_args <- method.args
-  }
-
-  experiments <- extract_multiassay_experiments(input_features)
-  omics_names <- names(experiments)
-  if (is.null(omics_names) || any(omics_names == "")) {
-    omics_names <- paste0("omics", seq_along(experiments))
-    names(experiments) <- omics_names
-  }
-  metadata <- extract_multiassay_metadata(input_features, input_metadata)
-  sample_map <- as.data.frame(MultiAssayExperiment::sampleMap(input_features))
-
-  results <- lapply(omics_names, function(omics_name) {
-    experiment <- coerce_multiassay_experiment_input(experiments[[omics_name]])
-    experiment_map <- sample_map[sample_map$assay == omics_name, , drop = FALSE]
-    primary_samples <- experiment_map$primary[
-      match(colnames(experiment), experiment_map$colname)
-    ]
-    if (anyNA(primary_samples)) {
-      stop(sprintf("sampleMap does not map every column in experiment %s.", omics_name))
+    input_metadata = NULL,
+    output = NULL,
+    assay_name = "counts",
+    abd_threshold = 0.0,
+    prev_threshold = 0.1,
+    var_threshold = 0.0,
+    entropy_threshold = 0.0,
+    base_model = "CPLM",
+    link = "log",
+    tweedie_p = NULL,
+    p0_transform = "NONE",
+    p0_transform_pseudocount = 1,
+    fixed_effects = NULL,
+    random_effects = NULL,
+    domain = "microbiome",
+    normalization = NULL,
+    adjust_offset = TRUE,
+    scale_factor = NULL,
+    max_significance = 0.05,
+    correction = "BH",
+    Maaslin2_run = TRUE,
+    median_comparison = FALSE,
+    median_subtraction = FALSE,
+    run_presence_absence_model = FALSE,
+    method_args = NULL,
+    method.args = NULL,
+    standardize = TRUE,
+    BPPARAM = BiocParallel::SerialParam(),
+    optimizer = "nlminb",
+    na.action = na.exclude,
+    plot_heatmap = FALSE,
+    plot_scatter = FALSE,
+    heatmap_first_n = 50,
+    reference = NULL,
+    min_presence_absence_count = 3L,
+    return_all = FALSE,
+    median_comparison_seed = NULL) {
+    if (!is.null(method_args) && !is.null(method.args)) {
+        stop("Please provide only one of method_args or method.args.")
     }
-    matched_samples <- primary_samples %in% rownames(metadata)
-    if (!any(matched_samples)) {
-      stop(sprintf("Sample metadata has no primary samples for experiment %s.", omics_name))
-    }
-    experiment <- experiment[, matched_samples, drop = FALSE]
-    primary_samples <- primary_samples[matched_samples]
-    experiment_metadata <- as.data.frame(
-      metadata[match(primary_samples, rownames(metadata)), , drop = FALSE]
-    )
-    rownames(experiment_metadata) <- colnames(experiment)
-    omics_output <- NULL
-    if (!is.null(output)) {
-      omics_output <- file.path(output, make.names(omics_name))
+    if (is.null(method_args)) {
+        method_args <- method.args
     }
 
-    fit <- .Tweedieverse_single(
-      input_features = experiment,
-      input_metadata = experiment_metadata,
-      output = omics_output,
-      assay_name = resolve_multiomics_arg(assay_name, omics_name, omics_names, "assay_name"),
-      abd_threshold = resolve_multiomics_arg(abd_threshold, omics_name, omics_names, "abd_threshold"),
-      prev_threshold = resolve_multiomics_arg(prev_threshold, omics_name, omics_names, "prev_threshold"),
-      var_threshold = resolve_multiomics_arg(var_threshold, omics_name, omics_names, "var_threshold"),
-      entropy_threshold = resolve_multiomics_arg(entropy_threshold, omics_name, omics_names, "entropy_threshold"),
-      base_model = resolve_multiomics_arg(base_model, omics_name, omics_names, "base_model"),
-      link = resolve_multiomics_arg(link, omics_name, omics_names, "link"),
-      tweedie_p = resolve_multiomics_arg(tweedie_p, omics_name, omics_names, "tweedie_p"),
-      p0_transform = resolve_multiomics_arg(p0_transform, omics_name, omics_names, "p0_transform"),
-      p0_transform_pseudocount = resolve_multiomics_arg(p0_transform_pseudocount, omics_name, omics_names, "p0_transform_pseudocount"),
-      fixed_effects = resolve_multiomics_arg(fixed_effects, omics_name, omics_names, "fixed_effects"),
-      random_effects = resolve_multiomics_arg(random_effects, omics_name, omics_names, "random_effects"),
-      domain = resolve_multiomics_arg(domain, omics_name, omics_names, "domain"),
-      normalization = resolve_multiomics_arg(normalization, omics_name, omics_names, "normalization"),
-      adjust_offset = resolve_multiomics_arg(adjust_offset, omics_name, omics_names, "adjust_offset"),
-      scale_factor = resolve_multiomics_arg(scale_factor, omics_name, omics_names, "scale_factor"),
-      max_significance = resolve_multiomics_arg(max_significance, omics_name, omics_names, "max_significance"),
-      correction = resolve_multiomics_arg(correction, omics_name, omics_names, "correction"),
-      Maaslin2_run = resolve_multiomics_arg(Maaslin2_run, omics_name, omics_names, "Maaslin2_run"),
-      median_comparison = resolve_multiomics_arg(median_comparison, omics_name, omics_names, "median_comparison"),
-      median_subtraction = resolve_multiomics_arg(median_subtraction, omics_name, omics_names, "median_subtraction"),
-      run_presence_absence_model = resolve_multiomics_arg(run_presence_absence_model, omics_name, omics_names, "run_presence_absence_model"),
-      method_args = resolve_multiomics_arg(method_args, omics_name, omics_names, "method_args"),
-      standardize = resolve_multiomics_arg(standardize, omics_name, omics_names, "standardize"),
-      BPPARAM = resolve_multiomics_arg(BPPARAM, omics_name, omics_names, "BPPARAM"),
-      optimizer = resolve_multiomics_arg(optimizer, omics_name, omics_names, "optimizer"),
-      na.action = na.action,
-      plot_heatmap = resolve_multiomics_arg(plot_heatmap, omics_name, omics_names, "plot_heatmap"),
-      plot_scatter = resolve_multiomics_arg(plot_scatter, omics_name, omics_names, "plot_scatter"),
-      heatmap_first_n = resolve_multiomics_arg(heatmap_first_n, omics_name, omics_names, "heatmap_first_n"),
-      reference = resolve_multiomics_arg(reference, omics_name, omics_names, "reference"),
-      min_presence_absence_count = resolve_multiomics_arg(
-        min_presence_absence_count, omics_name, omics_names, "min_presence_absence_count"
-      ),
-      return_all = resolve_multiomics_arg(return_all, omics_name, omics_names, "return_all"),
-      median_comparison_seed = resolve_multiomics_arg(
-        median_comparison_seed, omics_name, omics_names, "median_comparison_seed"
-      )
-    )
-    fit$omics <- rep(omics_name, nrow(fit))
-    fit <- dplyr::select(fit, dplyr::all_of("omics"), dplyr::everything())
-    fit
-  })
-  names(results) <- omics_names
-  class(results) <- c("TweedieverseMultiAssayResult", class(results))
-  results
+    experiments <- extract_multiassay_experiments(input_features)
+    omics_names <- names(experiments)
+    if (is.null(omics_names) || any(omics_names == "")) {
+        omics_names <- paste0("omics", seq_along(experiments))
+        names(experiments) <- omics_names
+    }
+    metadata <- extract_multiassay_metadata(input_features, input_metadata)
+    sample_map <- as.data.frame(MultiAssayExperiment::sampleMap(input_features))
+
+    results <- lapply(omics_names, function(omics_name) {
+        experiment <- coerce_multiassay_experiment_input(experiments[[
+            omics_name]])
+        experiment_map <- sample_map[sample_map$assay == omics_name, , drop =
+            FALSE]
+        primary_samples <- experiment_map$primary[
+            match(colnames(experiment), experiment_map$colname)
+        ]
+        if (anyNA(primary_samples)) {
+            {
+                condition_message1 <- paste0(
+                    "sampleMap does not map every column in ",
+                    "experiment %s.")
+                stop(sprintf(condition_message1, omics_name))
+            }
+        }
+        matched_samples <- primary_samples %in% rownames(metadata)
+        if (!any(matched_samples)) {
+            {
+                condition_message1 <- paste0(
+                    "Sample metadata has no primary samples ",
+                    "for experiment %s.")
+                stop(sprintf(condition_message1, omics_name))
+            }
+        }
+        experiment <- experiment[, matched_samples, drop = FALSE]
+        primary_samples <- primary_samples[matched_samples]
+        experiment_metadata <- as.data.frame(
+            metadata[match(primary_samples, rownames(metadata)), , drop = FALSE]
+        )
+        rownames(experiment_metadata) <- colnames(experiment)
+        omics_output <- NULL
+        if (!is.null(output)) {
+            omics_output <- file.path(output, make.names(omics_name))
+        }
+
+        fit <- .Tweedieverse_single(
+            input_features = experiment,
+            input_metadata = experiment_metadata,
+            output = omics_output,
+            assay_name = resolve_multiomics_arg(assay_name, omics_name,
+                omics_names, "assay_name"),
+            abd_threshold = resolve_multiomics_arg(abd_threshold, omics_name,
+                omics_names, "abd_threshold"),
+            prev_threshold = resolve_multiomics_arg(prev_threshold, omics_name,
+                omics_names, "prev_threshold"),
+            var_threshold = resolve_multiomics_arg(var_threshold, omics_name,
+                omics_names, "var_threshold"),
+            entropy_threshold = resolve_multiomics_arg(entropy_threshold,
+                omics_name, omics_names, "entropy_threshold"),
+            base_model = resolve_multiomics_arg(base_model, omics_name,
+                omics_names, "base_model"),
+            link = resolve_multiomics_arg(link, omics_name, omics_names,
+                "link"),
+            tweedie_p = resolve_multiomics_arg(tweedie_p, omics_name,
+                omics_names, "tweedie_p"),
+            p0_transform = resolve_multiomics_arg(p0_transform, omics_name,
+                omics_names, "p0_transform"),
+            p0_transform_pseudocount = resolve_multiomics_arg(
+                p0_transform_pseudocount, omics_name, omics_names,
+                "p0_transform_pseudocount"),
+            fixed_effects = resolve_multiomics_arg(fixed_effects, omics_name,
+                omics_names, "fixed_effects"),
+            random_effects = resolve_multiomics_arg(random_effects, omics_name,
+                omics_names, "random_effects"),
+            domain = resolve_multiomics_arg(domain, omics_name, omics_names,
+                "domain"),
+            normalization = resolve_multiomics_arg(normalization, omics_name,
+                omics_names, "normalization"),
+            adjust_offset = resolve_multiomics_arg(adjust_offset, omics_name,
+                omics_names, "adjust_offset"),
+            scale_factor = resolve_multiomics_arg(scale_factor, omics_name,
+                omics_names, "scale_factor"),
+            max_significance = resolve_multiomics_arg(max_significance,
+                omics_name, omics_names, "max_significance"),
+            correction = resolve_multiomics_arg(correction, omics_name,
+                omics_names, "correction"),
+            Maaslin2_run = resolve_multiomics_arg(Maaslin2_run, omics_name,
+                omics_names, "Maaslin2_run"),
+            median_comparison = resolve_multiomics_arg(median_comparison,
+                omics_name, omics_names, "median_comparison"),
+            median_subtraction = resolve_multiomics_arg(median_subtraction,
+                omics_name, omics_names, "median_subtraction"),
+            run_presence_absence_model = resolve_multiomics_arg(
+                run_presence_absence_model, omics_name, omics_names,
+                "run_presence_absence_model"),
+            method_args = resolve_multiomics_arg(method_args, omics_name,
+                omics_names, "method_args"),
+            standardize = resolve_multiomics_arg(standardize, omics_name,
+                omics_names, "standardize"),
+            BPPARAM = resolve_multiomics_arg(BPPARAM, omics_name, omics_names,
+                "BPPARAM"),
+            optimizer = resolve_multiomics_arg(optimizer, omics_name,
+                omics_names, "optimizer"),
+            na.action = na.action,
+            plot_heatmap = resolve_multiomics_arg(plot_heatmap, omics_name,
+                omics_names, "plot_heatmap"),
+            plot_scatter = resolve_multiomics_arg(plot_scatter, omics_name,
+                omics_names, "plot_scatter"),
+            heatmap_first_n = resolve_multiomics_arg(heatmap_first_n,
+                omics_name, omics_names, "heatmap_first_n"),
+            reference = resolve_multiomics_arg(reference, omics_name,
+                omics_names, "reference"),
+            min_presence_absence_count = resolve_multiomics_arg(
+                min_presence_absence_count, omics_name, omics_names,
+                    "min_presence_absence_count"
+            ),
+            return_all = resolve_multiomics_arg(return_all, omics_name,
+                omics_names, "return_all"),
+            median_comparison_seed = resolve_multiomics_arg(
+                median_comparison_seed, omics_name, omics_names,
+                    "median_comparison_seed"
+            )
+        )
+        fit$omics <- rep(omics_name, nrow(fit))
+        fit <- dplyr::select(fit, dplyr::all_of("omics"), dplyr::everything())
+        fit
+    })
+    names(results) <- omics_names
+    class(results) <- c("TweedieverseMultiAssayResult", class(results))
+    results
 }
 
-resolve_tweedieverse_bpparam <- function(BPPARAM = BiocParallel::SerialParam()) {
-  if (!inherits(BPPARAM, "BiocParallelParam")) {
-    stop("BPPARAM must be a BiocParallelParam object.")
-  }
-  BPPARAM
+resolve_tweedieverse_bpparam <- function(BPPARAM = BiocParallel::SerialParam(
+)) {
+    if (!inherits(BPPARAM, "BiocParallelParam")) {
+        stop("BPPARAM must be a BiocParallelParam object.")
+    }
+    BPPARAM
 }
 
 bpparam_worker_count <- function(BPPARAM) {
-  workers <- BiocParallel::bpnworkers(BPPARAM)
-  if (length(workers) != 1L || is.na(workers) || !is.finite(workers) || workers < 1) {
-    return(1L)
-  }
-  as.integer(workers)
+    workers <- BiocParallel::bpnworkers(BPPARAM)
+    if (length(workers) != 1L || is.na(workers) || !is.finite(workers) ||
+        workers < 1) {
+        return(1L)
+    }
+    as.integer(workers)
 }
 
 resolve_tweedieverse_normalization <- function(domain,
-                                               normalization = NULL,
-                                               scale_factor = NULL) {
-  if (!is.null(scale_factor)) {
-    return("USER")
-  }
+    normalization = NULL,
+    scale_factor = NULL) {
+    if (!is.null(scale_factor)) {
+        return("USER")
+    }
 
-  defaults <- c(
-    microbiome = "TSS",
-    single_cell = "SCRAN",
-    bulk_rnaseq = "TMM",
-    custom = "MEDIAN"
-  )
-
-  if (is.null(normalization)) {
-    normalization <- defaults[[domain]]
-  }
-
-  normalization <- toupper(normalization)
-  if (normalization == "DESEQ2") {
-    normalization <- "RLE"
-  }
-
-  all_choices <- c("TSS", "GMPR", "CSS", "SCRAN", "TMM", "RLE", "CPM", "MEDIAN", "NONE")
-  if (!normalization %in% all_choices) {
-    stop(
-      sprintf("normalization must be one of: %s", paste(all_choices, collapse = ", "))
+    defaults <- c(
+        microbiome = "TSS",
+        single_cell = "SCRAN",
+        bulk_rnaseq = "TMM",
+        custom = "MEDIAN"
     )
-  }
 
-  domain_choices <- switch(
-    domain,
-    microbiome = c("TSS", "GMPR", "CSS", "MEDIAN", "NONE"),
-    single_cell = c("SCRAN", "MEDIAN", "NONE"),
-    bulk_rnaseq = c("TMM", "RLE", "CPM", "MEDIAN", "NONE"),
-    custom = all_choices
-  )
-  if (!normalization %in% domain_choices) {
-    stop(
-      sprintf(
-        "normalization = %s is not supported for domain = %s. Supported choices are: %s",
-        normalization,
-        domain,
-        paste(domain_choices, collapse = ", ")
-      )
+    if (is.null(normalization)) {
+        normalization <- defaults[[domain]]
+    }
+
+    normalization <- toupper(normalization)
+    if (normalization == "DESEQ2") {
+        normalization <- "RLE"
+    }
+
+    all_choices <- c("TSS", "GMPR", "CSS", "SCRAN", "TMM", "RLE", "CPM",
+        "MEDIAN", "NONE")
+    if (!normalization %in% all_choices) {
+        stop(
+            sprintf("normalization must be one of: %s", paste(all_choices,
+                collapse = ", "))
+        )
+    }
+
+    domain_choices <- switch(domain,
+        microbiome = c("TSS", "GMPR", "CSS", "MEDIAN", "NONE"),
+        single_cell = c("SCRAN", "MEDIAN", "NONE"),
+        bulk_rnaseq = c("TMM", "RLE", "CPM", "MEDIAN", "NONE"),
+        custom = all_choices
     )
-  }
+    if (!normalization %in% domain_choices) {
+        {
+            condition_message1 <- paste0(
+                "normalization = %s is not supported for ",
+                "domain = %s. Supported choices are: %s")
+            stop(sprintf(condition_message1, normalization, domain, paste(
+                domain_choices,
+                collapse = ", ")))
+        }
+    }
 
-  normalization
+    normalization
 }
 
-validate_tweedieverse_size_factor <- function(size_factor, label = "size factor") {
-  size_factor <- as.numeric(size_factor)
-  if (any(!is.finite(size_factor)) || any(is.na(size_factor))) {
-    stop(sprintf("%s must contain only finite numeric values.", label))
-  }
-  if (any(size_factor <= 0)) {
-    stop(sprintf("%s must be strictly positive because Tweedieverse uses log(size_factor) as an offset.", label))
-  }
-  size_factor
+validate_tweedieverse_size_factor <- function(size_factor, label =
+    "size factor") {
+    size_factor <- as.numeric(size_factor)
+    if (any(!is.finite(size_factor)) || any(is.na(size_factor))) {
+        stop(sprintf("%s must contain only finite numeric values.", label))
+    }
+    if (any(size_factor <= 0)) {
+        {
+            condition_message1 <- paste0(
+                "%s must be strictly positive because ",
+                "Tweedieverse uses log(size_factor) as ", "an offset.")
+            stop(sprintf(condition_message1, label))
+        }
+    }
+    size_factor
 }
 
 center_tweedieverse_size_factor <- function(size_factor) {
-  size_factor <- validate_tweedieverse_size_factor(size_factor)
-  gm <- exp(mean(log(size_factor)))
-  size_factor / gm
+    size_factor <- validate_tweedieverse_size_factor(size_factor)
+    gm <- exp(mean(log(size_factor)))
+    size_factor / gm
 }
 
 compute_tweedieverse_size_factor <- function(features,
-                                             metadata,
-                                             normalization,
-                                             scale_factor = NULL) {
-  if (!is.null(scale_factor)) {
-    if (!scale_factor %in% colnames(metadata)) {
-      stop(
-        sprintf(
-          "The specified scale_factor variable is not present in the metadata table:\n%s",
-          scale_factor
-        )
-      )
+    metadata,
+    normalization,
+    scale_factor = NULL) {
+    if (!is.null(scale_factor)) {
+        if (!scale_factor %in% colnames(metadata)) {
+            {
+                condition_message1 <- paste0(
+                    "The specified scale_factor variable is ",
+                    "not present in the metadata table:\n%s")
+                stop(sprintf(condition_message1, scale_factor))
+            }
+        }
+        return(validate_tweedieverse_size_factor(metadata[, scale_factor],
+            "scale_factor"))
     }
-    return(validate_tweedieverse_size_factor(metadata[, scale_factor], "scale_factor"))
-  }
 
-  normalization <- toupper(normalization)
-  if (normalization == "NONE") {
-    return(rep(1, nrow(features)))
-  }
+    normalization <- toupper(normalization)
+    if (normalization == "NONE") {
+        return(rep(1, nrow(features)))
+    }
 
-  x <- features
-  if (!inherits(x, "sparseMatrix")) {
-    x <- as.matrix(x)
-    storage.mode(x) <- "numeric"
-  }
+    x <- features
+    if (!inherits(x, "sparseMatrix")) {
+        x <- as.matrix(x)
+        storage.mode(x) <- "numeric"
+    }
 
-  if (any(vapply(seq_len(ncol(x)), function(i) {
-    any(!is.finite(x[, i]) & !is.na(x[, i]))
-  }, logical(1)))) {
-    stop("Features must contain only finite values for size-factor normalization.")
-  }
+    if (any(vapply(seq_len(ncol(x)), function(i) {
+        any(!is.finite(x[, i]) & !is.na(x[, i]))
+    }, logical(1)))) {
+        stop("Features must contain only finite ",
+            "values for size-factor normalization.")
 
-  if (normalization %in% c("TSS", "CPM")) {
+    }
+
+    if (normalization %in% c("TSS", "CPM")) {
+        if (any(x < 0, na.rm = TRUE)) {
+            stop(sprintf("%s size factors require non-negative features.",
+                normalization))
+        }
+        return(center_tweedieverse_size_factor(Matrix::rowSums(x, na.rm =
+            TRUE)))
+    }
+
+    if (normalization == "MEDIAN") {
+        size_factor <- vapply(seq_len(nrow(x)), function(i) {
+            row <- as.numeric(x[i, ])
+            vals <- row[is.finite(row) & !is.na(row) & row > 0]
+            if (length(vals) == 0L) {
+                return(NA_real_)
+            }
+            stats::median(vals)
+        }, numeric(1))
+        return(center_tweedieverse_size_factor(size_factor))
+    }
+
     if (any(x < 0, na.rm = TRUE)) {
-      stop(sprintf("%s size factors require non-negative features.", normalization))
+        stop(sprintf("%s size factors require non-negative features.",
+            normalization))
     }
-    return(center_tweedieverse_size_factor(Matrix::rowSums(x, na.rm = TRUE)))
-  }
 
-  if (normalization == "MEDIAN") {
-    size_factor <- vapply(seq_len(nrow(x)), function(i) {
-      row <- as.numeric(x[i, ])
-      vals <- row[is.finite(row) & !is.na(row) & row > 0]
-      if (length(vals) == 0L) {
-        return(NA_real_)
-      }
-      stats::median(vals)
-    }, numeric(1))
-    return(center_tweedieverse_size_factor(size_factor))
-  }
+    if (normalization == "RLE") {
+        return(compute_rle_size_factor(x))
+    }
 
-  if (any(x < 0, na.rm = TRUE)) {
-    stop(sprintf("%s size factors require non-negative features.", normalization))
-  }
+    if (normalization == "GMPR") {
+        return(compute_gmpr_size_factor(x))
+    }
 
-  if (normalization == "RLE") {
-    return(compute_rle_size_factor(x))
-  }
+    if (normalization == "CSS") {
+        return(compute_css_size_factor(x))
+    }
 
-  if (normalization == "GMPR") {
-    return(compute_gmpr_size_factor(x))
-  }
+    if (normalization == "TMM") {
+        return(compute_tmm_size_factor(x))
+    }
 
-  if (normalization == "CSS") {
-    return(compute_css_size_factor(x))
-  }
+    if (normalization == "SCRAN") {
+        return(compute_scran_size_factor(x))
+    }
 
-  if (normalization == "TMM") {
-    return(compute_tmm_size_factor(x))
-  }
-
-  if (normalization == "SCRAN") {
-    return(compute_scran_size_factor(x))
-  }
-
-  stop(sprintf("Unsupported normalization: %s", normalization))
+    stop(sprintf("Unsupported normalization: %s", normalization))
 }
 
 compute_rle_size_factor <- function(x) {
-  geom_means <- vapply(seq_len(ncol(x)), function(i) {
-    col <- as.numeric(x[, i])
-    vals <- col[col > 0]
-    if (length(vals) == 0L) {
-      return(NA_real_)
+    geom_means <- vapply(seq_len(ncol(x)), function(i) {
+        col <- as.numeric(x[, i])
+        vals <- col[col > 0]
+        if (length(vals) == 0L) {
+            return(NA_real_)
+        }
+        exp(mean(log(vals)))
+    }, numeric(1))
+    keep <- is.finite(geom_means) & geom_means > 0
+    if (!any(keep)) {
+        stop("RLE size factors could not be computed ",
+            "because no feature has positive values.")
+
     }
-    exp(mean(log(vals)))
-  }, numeric(1))
-  keep <- is.finite(geom_means) & geom_means > 0
-  if (!any(keep)) {
-    stop("RLE size factors could not be computed because no feature has positive values.")
-  }
-  size_factor <- vapply(seq_len(nrow(x)), function(i) {
-    ratios <- as.numeric(x[i, keep]) / geom_means[keep]
-    stats::median(ratios[ratios > 0], na.rm = TRUE)
-  }, numeric(1))
-  center_tweedieverse_size_factor(size_factor)
+    size_factor <- vapply(seq_len(nrow(x)), function(i) {
+        ratios <- as.numeric(x[i, keep]) / geom_means[keep]
+        stats::median(ratios[ratios > 0], na.rm = TRUE)
+    }, numeric(1))
+    center_tweedieverse_size_factor(size_factor)
 }
 
 compute_gmpr_size_factor <- function(x) {
-  n_samples <- nrow(x)
-  ratios <- matrix(NA_real_, n_samples, n_samples)
-  for (i in seq_len(n_samples)) {
-    for (j in seq_len(n_samples)) {
-      if (i == j) {
-        next
-      }
-      shared <- x[i, ] > 0 & x[j, ] > 0
-      if (any(shared)) {
-        ratios[i, j] <- stats::median(x[i, shared] / x[j, shared])
-      }
+    n_samples <- nrow(x)
+    ratios <- matrix(NA_real_, n_samples, n_samples)
+    for (i in seq_len(n_samples)) {
+        for (j in seq_len(n_samples)) {
+            if (i == j) {
+                next
+            }
+            shared <- x[i, ] > 0 & x[j, ] > 0
+            if (any(shared)) {
+                ratios[i, j] <- stats::median(x[i, shared] / x[j, shared])
+            }
+        }
     }
-  }
-  size_factor <- apply(ratios, 1, function(row) {
-    vals <- row[is.finite(row) & row > 0]
-    if (length(vals) == 0L) {
-      return(NA_real_)
-    }
-    exp(mean(log(vals)))
-  })
-  center_tweedieverse_size_factor(size_factor)
+    size_factor <- apply(ratios, 1, function(row) {
+        vals <- row[is.finite(row) & row > 0]
+        if (length(vals) == 0L) {
+            return(NA_real_)
+        }
+        exp(mean(log(vals)))
+    })
+    center_tweedieverse_size_factor(size_factor)
 }
 
 compute_css_size_factor <- function(x, percentile = 0.75) {
-  positive_values <- x[x > 0]
-  if (length(positive_values) == 0L) {
-    stop("CSS size factors require at least one positive feature value.")
-  }
-  threshold <- as.numeric(stats::quantile(positive_values, probs = percentile, names = FALSE))
-  x[x > threshold] <- 0
-  size_factor <- Matrix::rowSums(x, na.rm = TRUE)
-  center_tweedieverse_size_factor(size_factor)
+    positive_values <- x[x > 0]
+    if (length(positive_values) == 0L) {
+        stop("CSS size factors require at least one positive feature value.")
+    }
+    threshold <- as.numeric(stats::quantile(positive_values, probs = percentile,
+        names = FALSE))
+    x[x > threshold] <- 0
+    size_factor <- Matrix::rowSums(x, na.rm = TRUE)
+    center_tweedieverse_size_factor(size_factor)
 }
 
 compute_tmm_size_factor <- function(x) {
-  if (!requireNamespace("edgeR", quietly = TRUE)) {
-    stop("edgeR is required for normalization = 'TMM'. Install edgeR or choose another normalization.")
-  }
-  counts <- Matrix::t(x)
-  dge <- edgeR::DGEList(counts = counts)
-  dge <- edgeR::calcNormFactors(dge, method = "TMM")
-  size_factor <- dge$samples$lib.size * dge$samples$norm.factors
-  center_tweedieverse_size_factor(size_factor)
+    if (!requireNamespace("edgeR", quietly = TRUE)) {
+        stop("edgeR is required for normalization = ",
+            "'TMM'. Install edgeR or choose another ",
+            "normalization.")
+    }
+    counts <- Matrix::t(x)
+    dge <- edgeR::DGEList(counts = counts)
+    dge <- edgeR::calcNormFactors(dge, method = "TMM")
+    size_factor <- dge$samples$lib.size * dge$samples$norm.factors
+    center_tweedieverse_size_factor(size_factor)
 }
 
 compute_scran_size_factor <- function(x) {
-  if (!requireNamespace("scran", quietly = TRUE) ||
-      !requireNamespace("SingleCellExperiment", quietly = TRUE)) {
-    stop("scran and SingleCellExperiment are required for normalization = 'SCRAN'. Install them or choose another normalization.")
-  }
-  sce <- SingleCellExperiment::SingleCellExperiment(list(counts = Matrix::t(x)))
-  sce <- scran::computeSumFactors(sce)
-  size_factor <- SingleCellExperiment::sizeFactors(sce)
-  center_tweedieverse_size_factor(size_factor)
+    if (!requireNamespace("scran", quietly = TRUE) ||
+        !requireNamespace("SingleCellExperiment", quietly = TRUE)) {
+        stop("scran and SingleCellExperiment are ",
+            "required for normalization = 'SCRAN'. ",
+            "Install them or choose another ", "normalization.")
+    }
+    sce <- SingleCellExperiment::SingleCellExperiment(list(counts = Matrix::t(
+        x)))
+    sce <- scran::computeSumFactors(sce)
+    size_factor <- SingleCellExperiment::sizeFactors(sce)
+    center_tweedieverse_size_factor(size_factor)
 }
 
 
@@ -694,13 +768,16 @@ compute_scran_size_factor <- function(x) {
 
 #' Median Comparison for Compositionality Adjustment
 #'
-#' Adjust Tweedieverse(or any other differential analysis methods) coefficient estimates and p-values by testing each taxon
+#' Adjust Tweedieverse(or any other differential analysis methods) coefficient
+#' estimates and p-values by testing each taxon
 #' against the *median* effect for the same metadata variable - a simple
 #' post-hoc strategy to curb false discoveries driven by the compositional
-#' nature of microbiome count data (after the approach adopted in **MaAsLin 3**).
+#' nature of microbiome count data (after the approach adopted in **MaAsLin
+#' 3**).
 #'
-#' @param df A `data.frame` returned by **Tweedieverse** or any other differential analysis methods containing (at
-#'   minimum) the columns  
+#' @param df A `data.frame` returned by **Tweedieverse** or any other
+#' differential analysis methods containing (at
+#'   minimum) the columns
 #'   `taxon`, `metadata`, `effect_size`, `pval`, `stderr`, and `qval`.
 #' @param p_cutoff Numeric.  Upper bound on the original p-value to include an
 #'   effect in the median calculation (default `0.95` = all non-missing).
@@ -724,12 +801,15 @@ compute_scran_size_factor <- function(x) {
 #'         distribution of the simulated medians;
 #'   \item derives a variance-inflated *offset* that accounts for the
 #'         covariance between each coefficient and the group median;
-#'   \item performs a two-sided Z-test of `H0 : beta_i = offset_i`, returning the
+#'   \item performs a two-sided Z-test of `H0 : beta_i = offset_i`, returning
+#' the
 #'         resulting p-value in `pval_median`.
 #' }
 #'
-#' @param seed Optional non-negative integer seed for the simulations. Default is NULL,
-#' which uses the current random-number stream. A supplied seed is scoped with withr
+#' @param seed Optional non-negative integer seed for the simulations. Default
+#' is NULL,
+#' which uses the current random-number stream. A supplied seed is scoped with
+#' withr
 #' and restores the preceding random-number state when this function exits.
 #'
 #' @return
@@ -766,404 +846,425 @@ compute_scran_size_factor <- function(x) {
 #'
 #' @export
 median_comparison_tweedie <- function(df,
-                                      p_cutoff = 0.95,
-                                      subtract_median = FALSE,
-                                      n_sims = 10000,
-                                      median_threshold = 0,
-                                      seed = NULL) {
-  if (!is.null(seed)) {
-    if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
-        seed < 0 || seed > .Machine$integer.max || seed != floor(seed)) {
-      stop("seed must be NULL or a single non-negative integer.")
+    p_cutoff = 0.95,
+    subtract_median = FALSE,
+    n_sims = 10000,
+    median_threshold = 0,
+    seed = NULL) {
+    if (!is.null(seed)) {
+        if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
+            seed < 0 || seed > .Machine$integer.max || seed != floor(seed)) {
+            stop("seed must be NULL or a single non-negative integer.")
+        }
+        withr::local_seed(seed)
     }
-    withr::local_seed(seed)
-  }
-  # df is your Tweedieverse output data.frame with columns:
-  #   taxon, metadata, effect_size, pval, stderr, qval
-  #
-  # We'll store results here:
-  df$pval_median <- NA_real_
-  df$coef_median <- df$effect_size  # By default, same as effect_size
-  
-  # Process each metadata variable separately
-  for (md in unique(df$metadata)) {
-    # 1) Subset to just this metadata predictor
-    sub_idx <- which(df$metadata == md)
-    sub_df  <- df[sub_idx, ]
-    
-    # 2) Filter out obviously "bad" or huge p-values before computing the median
-    use_idx <- which(!is.na(sub_df$pval) & sub_df$pval < p_cutoff)
-    if (length(use_idx) == 0) {
-      # If none are usable, move on
-      next
+    # df is your Tweedieverse output data.frame with columns:
+    #   taxon, metadata, effect_size, pval, stderr, qval
+    #
+    # We'll store results here:
+    df$pval_median <- NA_real_
+    df$coef_median <- df$effect_size # By default, same as effect_size
+
+    # Process each metadata variable separately
+    for (md in unique(df$metadata)) {
+        # 1) Subset to just this metadata predictor
+        sub_idx <- which(df$metadata == md)
+        sub_df <- df[sub_idx, ]
+
+        # 2) Filter out obviously "bad" or huge p-values before computing the
+        # median
+        use_idx <- which(!is.na(sub_df$pval) & sub_df$pval < p_cutoff)
+        if (length(use_idx) == 0) {
+            # If none are usable, move on
+            next
+        }
+
+        # 3) Compute the "group-wide" median of the usable coefficients
+        cur_median <- stats::median(sub_df$effect_size[use_idx], na.rm = TRUE)
+        if (is.na(cur_median)) {
+            # If no valid median, skip
+            next
+        }
+
+        # 4) Optionally shift each coefficient by the median
+        if (subtract_median) {
+            sub_df$coef_median <- sub_df$effect_size - cur_median
+        } else {
+            sub_df$coef_median <- sub_df$effect_size
+        }
+
+        coefs <- sub_df$effect_size
+        ses <- sub_df$stderr
+        n_coefs <- length(coefs)
+
+        # Identify which coefficients were used for the median
+        use_bool <- rep(FALSE, n_coefs)
+        use_bool[use_idx] <- TRUE
+
+        # 5) Simulate draws to approximate correlation of each coefficient w/
+        # median
+        #    sim_results has columns = draws, row 1 = simulated median, next
+        # rows = coefs
+        sim_results <- replicate(n_sims, {
+            sim_coefs <- stats::rnorm(n_coefs, mean = coefs, sd = ses)
+            sim_median <- stats::median(sim_coefs[use_bool])
+            c(sim_median, sim_coefs)
+        })
+
+        sim_medians <- sim_results[1, ]
+        all_sims <- sim_results[-1, , drop = FALSE] # row i => draws for coef i
+
+        # Covariance of each coefficient with the median, across draws
+        cov_adjust <- apply(all_sims, 1, function(x) stats::cov(x, sim_medians))
+
+            # 6) Offset to test for each coefficient, following MaAsLin 3.
+            #    offset_i = coefs[i] +/- ... depends on difference from median &
+            # correlation
+            median_sd <- sd(
+                sim_medians) # the empirical SD of the simulated median
+            offsets_to_test <- abs(cur_median - coefs) *
+            sqrt((ses^2) / (ses^2 + median_sd^2 - 2 * cov_adjust)) + coefs
+
+            # 7) For each coefficient, finalize the p-value vs. the median
+            #    - If difference from median < threshold => p=1
+            #    - Else do test:  H0: coef[i] = offsets_to_test[i]
+            #        =>  z = (coef - offset) / SE
+            pvals_median <- numeric(n_coefs)
+
+            for (i in seq_len(n_coefs)) {
+            if (abs(coefs[i] - cur_median) < median_threshold) {
+                # If difference is trivially small => p=1
+                pvals_median[i] <- 1
+            } else if (is.na(coefs[i]) || is.na(ses[i]) || ses[i] == 0) {
+                pvals_median[i] <- NA
+            } else {
+                # Normal approx. test for H0: coefs[i] == offsets_to_test[i]
+                z_stat <- (coefs[i] - offsets_to_test[i]) / ses[i]
+                pvals_median[i] <- 2 * stats::pnorm(abs(z_stat), lower.tail =
+                    FALSE)
+            }
+        }
+
+        # Save the results back into the subset
+        sub_df$pval_median <- pvals_median
+        df[sub_idx, ] <- sub_df
     }
-    
-    # 3) Compute the "group-wide" median of the usable coefficients
-    cur_median <- stats::median(sub_df$effect_size[use_idx], na.rm = TRUE)
-    if (is.na(cur_median)) {
-      # If no valid median, skip
-      next
-    }
-    
-    # 4) Optionally shift each coefficient by the median
-    if (subtract_median) {
-      sub_df$coef_median <- sub_df$effect_size - cur_median
-    } else {
-      sub_df$coef_median <- sub_df$effect_size
-    }
-    
-    coefs    <- sub_df$effect_size
-    ses      <- sub_df$stderr
-    n_coefs  <- length(coefs)
-    
-    # Identify which coefficients were used for the median
-    use_bool <- rep(FALSE, n_coefs)
-    use_bool[use_idx] <- TRUE
-    
-    # 5) Simulate draws to approximate correlation of each coefficient w/ median
-    #    sim_results has columns = draws, row 1 = simulated median, next rows = coefs
-    sim_results <- replicate(n_sims, {
-      sim_coefs   <- stats::rnorm(n_coefs, mean = coefs, sd = ses)
-      sim_median  <- stats::median(sim_coefs[use_bool])
-      c(sim_median, sim_coefs)
-    })
-    
-    sim_medians <- sim_results[1, ]
-    all_sims    <- sim_results[-1, , drop = FALSE]  # row i => draws for coef i
-    
-    # Covariance of each coefficient with the median, across draws
-    cov_adjust <- apply(all_sims, 1, function(x) stats::cov(x, sim_medians))
-    
-    # 6) "offset to test" for each coefficient, per the MaAsLin 3 approach:
-    #    offset_i = coefs[i] +/- ... depends on difference from median & correlation
-    median_sd <- sd(sim_medians)  # the empirical SD of the simulated median
-    offsets_to_test <- abs(cur_median - coefs) *
-      sqrt( (ses^2) / ( ses^2 + median_sd^2 - 2*cov_adjust ) ) + coefs
-    
-    # 7) For each coefficient, finalize the p-value vs. the median
-    #    - If difference from median < threshold => p=1
-    #    - Else do test:  H0: coef[i] = offsets_to_test[i]
-    #        =>  z = (coef - offset) / SE
-    pvals_median <- numeric(n_coefs)
-    
-    for (i in seq_len(n_coefs)) {
-      if (abs(coefs[i] - cur_median) < median_threshold) {
-        # If difference is trivially small => p=1
-        pvals_median[i] <- 1
-      } else if (is.na(coefs[i]) || is.na(ses[i]) || ses[i] == 0) {
-        pvals_median[i] <- NA
-      } else {
-        # Normal approx. test for H0: coefs[i] == offsets_to_test[i]
-        z_stat <- (coefs[i] - offsets_to_test[i]) / ses[i]
-        pvals_median[i] <- 2 * stats::pnorm(abs(z_stat), lower.tail = FALSE)
-      }
-    }
-    
-    # Save the results back into the subset
-    sub_df$pval_median <- pvals_median
-    df[sub_idx, ]      <- sub_df
-  }
-  
-  # Return the augmented data
-  return(df)
+
+    # Return the augmented data
+    return(df)
 }
 
 tweedieverse_cct <- function(pvals, weights = NULL) {
-  available <- !is.na(pvals)
-  if (!is.null(weights)) {
-    if (length(weights) != length(pvals)) {
-      stop("weights must have the same length as pvals.")
+    available <- !is.na(pvals)
+    if (!is.null(weights)) {
+        if (length(weights) != length(pvals)) {
+            stop("weights must have the same length as pvals.")
+        }
+        weights <- weights[available]
+        if (any(weights < 0)) {
+            stop("weights must be non-negative.")
+        }
     }
-    weights <- weights[available]
-    if (any(weights < 0)) {
-      stop("weights must be non-negative.")
+    pvals <- pvals[available]
+    if (any(pvals < 0 | pvals > 1)) {
+        stop("All p-values must be between 0 and 1.")
     }
-  }
-  pvals <- pvals[available]
-  if (any(pvals < 0 | pvals > 1)) {
-    stop("All p-values must be between 0 and 1.")
-  }
 
-  if (length(pvals) == 0L) {
-    return(NA_real_)
-  }
-  if (length(pvals) == 1L) {
-    return(pvals[[1L]])
-  }
-  # Give exact zero precedence when both Cauchy endpoints occur.
-  if (any(pvals == 0)) {
-    return(0)
-  }
-  if (any(pvals == 1)) {
-    return(1)
-  }
+    if (length(pvals) == 0L) {
+        return(NA_real_)
+    }
+    if (length(pvals) == 1L) {
+        return(pvals[[1L]])
+    }
+    # Give exact zero precedence when both Cauchy endpoints occur.
+    if (any(pvals == 0)) {
+        return(0)
+    }
+    if (any(pvals == 1)) {
+        return(1)
+    }
 
-  if (is.null(weights)) {
-    weights <- rep(1 / length(pvals), length(pvals))
-  } else {
-    weights <- weights / sum(weights)
-  }
+    if (is.null(weights)) {
+        weights <- rep(1 / length(pvals), length(pvals))
+    } else {
+        weights <- weights / sum(weights)
+    }
 
-  is_small <- pvals < 1e-16
-  if (!any(is_small)) {
-    cct_stat <- sum(weights * tan((0.5 - pvals) * pi))
-  } else {
-    cct_stat <- sum((weights[is_small] / pvals[is_small]) / pi)
-    cct_stat <- cct_stat +
-      sum(weights[!is_small] * tan((0.5 - pvals[!is_small]) * pi))
-  }
+    is_small <- pvals < 1e-16
+    if (!any(is_small)) {
+        cct_stat <- sum(weights * tan((0.5 - pvals) * pi))
+    } else {
+        cct_stat <- sum((weights[is_small] / pvals[is_small]) / pi)
+        cct_stat <- cct_stat +
+            sum(weights[!is_small] * tan((0.5 - pvals[!is_small]) * pi))
+    }
 
-  if (cct_stat > 1e15) {
-    return((1 / cct_stat) / pi)
-  }
-  1 - stats::pcauchy(cct_stat)
+    if (cct_stat > 1e15) {
+        return((1 / cct_stat) / pi)
+    }
+    1 - stats::pcauchy(cct_stat)
 }
 
 tweedieverse_cct_rows <- function(mat) {
-  if (ncol(mat) == 1L) {
-    return(as.numeric(mat[, 1L]))
-  }
-  apply(mat, 1L, function(pv) tweedieverse_cct(as.numeric(pv)))
-}
+    if (ncol(mat) == 1L) {
+        return(as.numeric(mat[, 1L]))
+    }
+    apply(mat, 1L, function(pv) tweedieverse_cct(as.numeric(pv)))
+        }
 
-presence_augmentation_weight <- function(formula, data) {
-  rhs_formula <- stats::delete.response(stats::terms(formula))
-  n_predictors <- ncol(stats::model.matrix(rhs_formula, data = data))
-  n_predictors / (2 * nrow(data))
+        presence_augmentation_weight <- function(formula, data) {
+    rhs_formula <- stats::delete.response(stats::terms(formula))
+    n_predictors <- ncol(stats::model.matrix(rhs_formula, data = data))
+    n_predictors / (2 * nrow(data))
 }
 
 augment_presence_data <- function(formula,
-                                  data,
-                                  response = "expr",
-                                  weights = NULL) {
-  n_samples <- nrow(data)
-  if (is.null(weights)) {
-    weights <- rep(1, n_samples)
-  }
-  if (length(weights) != n_samples) {
-    stop("weights must have length equal to the number of samples.")
-  }
+    data,
+    response = "expr",
+    weights = NULL) {
+    n_samples <- nrow(data)
+    if (is.null(weights)) {
+        weights <- rep(1, n_samples)
+    }
+    if (length(weights) != n_samples) {
+        stop("weights must have length equal to the number of samples.")
+    }
 
-  augmentation_weight <- presence_augmentation_weight(formula, data)
-  data_zero <- data
-  data_one <- data
-  data_zero[[response]] <- 0L
-  data_one[[response]] <- 1L
+    augmentation_weight <- presence_augmentation_weight(formula, data)
+    data_zero <- data
+    data_one <- data
+    data_zero[[response]] <- 0L
+    data_one[[response]] <- 1L
 
-  list(
-    data = rbind(data, data_zero, data_one),
-    weights = c(
-      weights,
-      rep(augmentation_weight, n_samples),
-      rep(augmentation_weight, n_samples)
+    list(
+        data = rbind(data, data_zero, data_one),
+        weights = c(
+            weights,
+            rep(augmentation_weight, n_samples),
+            rep(augmentation_weight, n_samples)
+        )
     )
-  )
 }
 
 fit_augmented_presence_model <- function(formula,
-                                         data,
-                                         has_random_effects = FALSE,
-                                         offset = NULL,
-                                         na.action = na.exclude) {
-  augmented <- augment_presence_data(formula = formula, data = data)
-  model_offset <- NULL
-  if (!is.null(offset)) {
-    if (length(offset) != nrow(data)) {
-      stop("offset must have length equal to the number of samples.")
+    data,
+    has_random_effects = FALSE,
+    offset = NULL,
+    na.action = na.exclude) {
+    augmented <- augment_presence_data(formula = formula, data = data)
+    model_offset <- NULL
+    if (!is.null(offset)) {
+        if (length(offset) != nrow(data)) {
+            stop("offset must have length equal to the number of samples.")
+        }
+        model_offset <- rep(offset, 3L)
     }
-    model_offset <- rep(offset, 3L)
-  }
 
-  fit_fun <- if (has_random_effects) glmmTMB::glmmTMB else stats::glm
-  args <- list(
-    formula = formula,
-    family = stats::binomial(),
-    data = augmented$data,
-    weights = augmented$weights,
-    na.action = na.action
-  )
-  if (!is.null(model_offset)) {
-    args$offset <- model_offset
-  }
+    fit_fun <- if (has_random_effects) glmmTMB::glmmTMB else stats::glm
+    args <- list(
+        formula = formula,
+        family = stats::binomial(),
+        data = augmented$data,
+        weights = augmented$weights,
+        na.action = na.action
+    )
+    if (!is.null(model_offset)) {
+        args$offset <- model_offset
+    }
 
-  withCallingHandlers(
-    do.call(fit_fun, args),
-    warning = function(w) {
-      if (grepl("non-integer #successes in a binomial glm!",
+    withCallingHandlers(
+        do.call(fit_fun, args),
+        warning = function(w) {
+            if (grepl("non-integer #successes in a binomial glm!",
                 conditionMessage(w),
-                fixed = TRUE)) {
-        invokeRestart("muffleWarning")
-      }
-    }
-  )
+                fixed = TRUE
+            )) {
+                invokeRestart("muffleWarning")
+            }
+        }
+    )
 }
 
 fit_presence_absence_model <- function(features,
-                                       metadata,
-                                       formula,
-                                       random_effects_formula = NULL,
-                                       correction = "BH",
-                                       BPPARAM = BiocParallel::SerialParam(),
-                                       na.action = na.exclude,
-                                       min_presence_absence_count = 3L) {
-  if (!is.null(random_effects_formula) &&
-      !requireNamespace("glmmTMB", quietly = TRUE)) {
-    stop("glmmTMB is required for presence-absence models with random_effects.")
-  }
+    metadata,
+    formula,
+    random_effects_formula = NULL,
+    correction = "BH",
+    BPPARAM = BiocParallel::SerialParam(),
+    na.action = na.exclude,
+    min_presence_absence_count = 3L) {
+    if (!is.null(random_effects_formula) &&
+        !requireNamespace("glmmTMB", quietly = TRUE)) {
+        stop("glmmTMB is required for ", "presence-absence models with ",
+            "random_effects.")
+    }
 
-  presence_formula <- formula
-  has_random_effects <- !is.null(random_effects_formula)
-  if (has_random_effects) {
-    fixed_terms <- setdiff(all.vars(formula)[-1], "offset")
-    formula_text <-
-      paste(". ~", paste(fixed_terms, collapse = " + "), ".", sep = " + ")
-    presence_formula <- stats::update(random_effects_formula, formula_text)
-  }
+    presence_formula <- formula
+    has_random_effects <- !is.null(random_effects_formula)
+    if (has_random_effects) {
+        fixed_terms <- setdiff(all.vars(formula)[-1], "offset")
+        formula_text <-
+            paste(". ~", paste(fixed_terms, collapse = " + "), ".", sep = " + ")
+        presence_formula <- stats::update(random_effects_formula, formula_text)
+    }
 
-  log_offset <- NULL
-  if ("offset" %in% colnames(metadata)) {
-    log_offset <- log(metadata$offset)
-  }
-  metadata_names <- setdiff(colnames(metadata), "offset")
-  model_columns <- intersect(c(all.vars(presence_formula), "offset"), colnames(metadata))
-  complete_metadata <- rowSums(is.na(metadata[, model_columns, drop = FALSE])) == 0L
+    log_offset <- NULL
+    if ("offset" %in% colnames(metadata)) {
+        log_offset <- log(metadata$offset)
+    }
+    metadata_names <- setdiff(colnames(metadata), "offset")
+    model_columns <- intersect(c(all.vars(presence_formula), "offset"),
+        colnames(metadata))
+    complete_metadata <- rowSums(is.na(metadata[, model_columns, drop =
+        FALSE])) == 0L
 
-  BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
+    BPPARAM <- resolve_tweedieverse_bpparam(BPPARAM = BPPARAM)
 
-  outputs <- BiocParallel::bplapply(seq_len(ncol(features)), function(x) {
-    expr <- as.integer(features[, x] > 0)
-    observed <- expr[complete_metadata]
-    n_present <- sum(observed == 1L, na.rm = TRUE)
-    n_absent <- sum(observed == 0L, na.rm = TRUE)
+    outputs <- BiocParallel::bplapply(seq_len(ncol(features)), function(x) {
+        expr <- as.integer(features[, x] > 0)
+        observed <- expr[complete_metadata]
+        n_present <- sum(observed == 1L, na.rm = TRUE)
+        n_absent <- sum(observed == 0L, na.rm = TRUE)
 
-    if (min(n_present, n_absent) < min_presence_absence_count) {
-      para <- as.data.frame(matrix(NA_real_, nrow = length(metadata_names), ncol = 5))
-      para$name <- metadata_names
-    } else {
-      fit <- try(
-        fit_augmented_presence_model(
-          formula = presence_formula,
-          data = data.frame(metadata, expr = expr),
-          has_random_effects = has_random_effects,
-          offset = log_offset,
-          na.action = na.action
-        ),
-        silent = TRUE
-      )
-
-      if (!inherits(fit, "try-error")) {
-        summary_matrix <- if (has_random_effects) {
-          summary(fit)$coefficients$cond
+        if (min(n_present, n_absent) < min_presence_absence_count) {
+            para <- as.data.frame(matrix(NA_real_, nrow = length(
+                metadata_names), ncol = 5))
+            para$name <- metadata_names
         } else {
-          stats::coef(summary(fit))
+            fit <- try(
+                fit_augmented_presence_model(
+                    formula = presence_formula,
+                    data = data.frame(metadata, expr = expr),
+                    has_random_effects = has_random_effects,
+                    offset = log_offset,
+                    na.action = na.action
+                ),
+                silent = TRUE
+            )
+
+            if (!inherits(fit, "try-error")) {
+                summary_matrix <- if (has_random_effects) {
+                    summary(fit)$coefficients$cond
+                } else {
+                    stats::coef(summary(fit))
+                }
+                p_col <- intersect(c("Pr(>|z|)", "Pr(>|t|)"), colnames(
+                    summary_matrix))[1]
+                if (!is.na(p_col)) {
+                    para <- as.data.frame(summary_matrix)[-1, c("Estimate",
+                        "Std. Error", p_col), drop = FALSE]
+                    para$base.model <- "Presence-absence LR"
+                    para$tweedie.index <- NA_real_
+                    para$name <- rownames(summary_matrix)[-1]
+                } else {
+                    para <- as.data.frame(matrix(NA_real_, nrow = length(
+                        metadata_names), ncol = 5))
+                    para$name <- metadata_names
+                }
+            } else {
+                para <- as.data.frame(matrix(NA_real_, nrow = length(
+                    metadata_names), ncol = 5))
+                para$name <- metadata_names
+            }
         }
-        p_col <- intersect(c("Pr(>|z|)", "Pr(>|t|)"), colnames(summary_matrix))[1]
-        if (!is.na(p_col)) {
-          para <- as.data.frame(summary_matrix)[-1, c("Estimate", "Std. Error", p_col), drop = FALSE]
-          para$base.model <- "Presence-absence LR"
-          para$tweedie.index <- NA_real_
-          para$name <- rownames(summary_matrix)[-1]
+
+        colnames(para) <- c("coef", "stderr", "pval", "base.model",
+            "tweedie.index", "name")
+        para$feature <- colnames(features)[x]
+        para
+    }, BPPARAM = BPPARAM)
+
+    paras <- do.call(rbind, outputs)
+    paras$qval <- as.numeric(stats::p.adjust(paras$pval, method = correction))
+
+    metadata_names_ordered <- metadata_names[order(nchar(metadata_names),
+        decreasing = TRUE)]
+    extract_metadata_name <- function(name) {
+        hit <- metadata_names_ordered[mapply(startsWith, name,
+            metadata_names_ordered)][1]
+        if (is.na(hit)) {
+            return(name)
+        }
+        hit
+    }
+    paras$metadata <- unlist(lapply(paras$name, extract_metadata_name))
+    paras$value <- mapply(function(x, y) {
+        if (is.na(x) || is.na(y) || x == y) {
+            x
         } else {
-          para <- as.data.frame(matrix(NA_real_, nrow = length(metadata_names), ncol = 5))
-          para$name <- metadata_names
+            gsub(x, "", y)
         }
-      } else {
-        para <- as.data.frame(matrix(NA_real_, nrow = length(metadata_names), ncol = 5))
-        para$name <- metadata_names
-      }
-    }
-
-    colnames(para) <- c("coef", "stderr", "pval", "base.model", "tweedie.index", "name")
-    para$feature <- colnames(features)[x]
-    para
-  }, BPPARAM = BPPARAM)
-
-  paras <- do.call(rbind, outputs)
-  paras$qval <- as.numeric(stats::p.adjust(paras$pval, method = correction))
-
-  metadata_names_ordered <- metadata_names[order(nchar(metadata_names), decreasing = TRUE)]
-  extract_metadata_name <- function(name) {
-    hit <- metadata_names_ordered[mapply(startsWith, name, metadata_names_ordered)][1]
-    if (is.na(hit)) {
-      return(name)
-    }
-    hit
-  }
-  paras$metadata <- unlist(lapply(paras$name, extract_metadata_name))
-  paras$value <- mapply(function(x, y) {
-    if (is.na(x) || is.na(y) || x == y) {
-      x
-    } else {
-      gsub(x, "", y)
-    }
-  }, paras$metadata, paras$name)
-  paras <- paras[order(paras$qval, decreasing = FALSE),]
-  paras <- dplyr::select(paras, c("feature", "metadata", "value"), dplyr::everything())
-  paras <- dplyr::select(paras, -name)
-  rownames(paras) <- NULL
-  paras
+    }, paras$metadata, paras$name)
+    paras <- paras[order(paras$qval, decreasing = FALSE), ]
+    paras <- dplyr::select(paras, c("feature", "metadata", "value"),
+        dplyr::everything())
+    paras <- dplyr::select(paras, -name)
+    rownames(paras) <- NULL
+    paras
 }
 
 combine_abundance_presence_results <- function(abundance_results,
-                                               presence_results,
-                                               correction = "BH") {
-  abundance_keep <- dplyr::select(
-    abundance_results,
-    feature,
-    metadata,
-    value,
-    coef_abundance = coef,
-    stderr_abundance = stderr,
-    pval_abundance = pval,
-    qval_abundance = qval,
-    base.model_abundance = base.model,
-    tweedie.index
-  )
-  presence_keep <- dplyr::select(
     presence_results,
-    feature,
-    metadata,
-    value,
-    coef_presence = coef,
-    stderr_presence = stderr,
-    pval_presence = pval,
-    qval_presence = qval,
-    base.model_presence = base.model
-  )
+    correction = "BH") {
+    abundance_keep <- dplyr::select(
+        abundance_results,
+        feature,
+        metadata,
+        value,
+        coef_abundance = coef,
+        stderr_abundance = stderr,
+        pval_abundance = pval,
+        qval_abundance = qval,
+        base.model_abundance = base.model,
+        tweedie.index
+    )
+    presence_keep <- dplyr::select(
+        presence_results,
+        feature,
+        metadata,
+        value,
+        coef_presence = coef,
+        stderr_presence = stderr,
+        pval_presence = pval,
+        qval_presence = qval,
+        base.model_presence = base.model
+    )
 
-  combined <- dplyr::left_join(
-    abundance_keep,
-    presence_keep,
-    by = c("feature", "metadata", "value")
-  )
-  pmat <- as.matrix(combined[, c("pval_abundance", "pval_presence"), drop = FALSE])
-  combined$pval <- tweedieverse_cct_rows(pmat)
-  combined$qval <- as.numeric(stats::p.adjust(combined$pval, method = correction))
-  combined$coef <- combined$coef_abundance
-  combined$stderr <- combined$stderr_abundance
-  combined$base.model <- "CCT"
-  combined <- dplyr::select(
-    combined,
-    feature,
-    metadata,
-    value,
-    coef,
-    stderr,
-    pval,
-    qval,
-    coef_abundance,
-    stderr_abundance,
-    pval_abundance,
-    qval_abundance,
-    coef_presence,
-    stderr_presence,
-    pval_presence,
-    qval_presence,
-    base.model,
-    base.model_abundance,
-    base.model_presence,
-    tweedie.index
-  )
-  rownames(combined) <- NULL
-  combined
+    combined <- dplyr::left_join(
+        abundance_keep,
+        presence_keep,
+        by = c("feature", "metadata", "value")
+    )
+    pmat <- as.matrix(combined[, c("pval_abundance", "pval_presence"), drop =
+        FALSE])
+    combined$pval <- tweedieverse_cct_rows(pmat)
+    combined$qval <- as.numeric(stats::p.adjust(combined$pval, method =
+        correction))
+    combined$coef <- combined$coef_abundance
+    combined$stderr <- combined$stderr_abundance
+    combined$base.model <- "CCT"
+    combined <- dplyr::select(
+        combined,
+        feature,
+        metadata,
+        value,
+        coef,
+        stderr,
+        pval,
+        qval,
+        coef_abundance,
+        stderr_abundance,
+        pval_abundance,
+        qval_abundance,
+        coef_presence,
+        stderr_presence,
+        pval_presence,
+        qval_presence,
+        base.model,
+        base.model_abundance,
+        base.model_presence,
+        tweedie.index
+    )
+    rownames(combined) <- NULL
+    combined
 }

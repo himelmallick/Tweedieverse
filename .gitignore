@@ -35,4 +35,5 @@
 *.utf8.md
 *.knit.md
 
+# macOS metadata, at every directory level
 .DS_Store
