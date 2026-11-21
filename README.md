@@ -15,6 +15,18 @@ other omics measurements through Bioconductor containers.
 
 ## Installation
 
+Once Tweedieverse is available in your Bioconductor version, install it with:
+
+```r
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+BiocManager::install("Tweedieverse")
+```
+
+See the [Bioconductor installation guide](https://bioconductor.org/install/)
+for R/Bioconductor version compatibility and setup.
+
 Install the development version from GitHub:
 
 ```r

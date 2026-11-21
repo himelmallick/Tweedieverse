@@ -1,4 +1,6 @@
 Changes in version 0.99.3 (2026-11-21):
+* Add Bioconductor installation instructions to the README alongside the
+  GitHub development installation, retaining the existing vignette instructions.
 * Correct log messages for Tweedie index and heatmap plots, and remove redundant
   output arguments from internal plot helpers and their callers.
 * Remove the unused full Franzosa MultiAssayExperiment RData file and its
