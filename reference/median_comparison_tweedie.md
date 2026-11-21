@@ -1,0 +1,123 @@
+# Median Comparison for Compositionality Adjustment
+
+Adjust Tweedieverse(or any other differential analysis methods)
+coefficient estimates and p-values by testing each taxon against the
+\*median\* effect for the same metadata variable - a simple post-hoc
+strategy to curb false discoveries driven by the compositional nature of
+microbiome count data (after the approach adopted in \*\*MaAsLin 3\*\*).
+
+## Usage
+
+``` r
+median_comparison_tweedie(
+    df,
+    p_cutoff = 0.95,
+    subtract_median = FALSE,
+    n_sims = 10000,
+    median_threshold = 0,
+    seed = NULL
+)
+```
+
+## Arguments
+
+- df:
+
+  A \`data.frame\` returned by \*\*Tweedieverse\*\* or any other
+  differential analysis methods containing (at minimum) the columns
+  \`taxon\`, \`metadata\`, \`effect_size\`, \`pval\`, \`stderr\`, and
+  \`qval\`.
+
+- p_cutoff:
+
+  Numeric. Upper bound on the original p-value to include an effect in
+  the median calculation (default \`0.95\` = all non-missing).
+
+- subtract_median:
+
+  Logical. If \`TRUE\`, subtracts the group median from every
+  coefficient before returning it in \`coef_median\`; otherwise the
+  original \`effect_size\` is copied unchanged (default \`FALSE\`).
+
+- n_sims:
+
+  Integer. Number of Monte-Carlo simulations used to estimate the
+  covariance between each coefficient and the group median (default \`10
+  000\`).
+
+- median_threshold:
+
+  Numeric. Absolute difference below which a coefficient is considered
+  effectively equal to the median and assigned \`pval_median = 1\`
+  (default \`0\`).
+
+- seed:
+
+  Optional non-negative integer seed for the simulations. Default is
+  NULL, which uses the current random-number stream. A supplied seed is
+  scoped with withr and restores the preceding random-number state when
+  this function exits.
+
+## Value
+
+The input \`df\` with two new columns:
+
+- \`coef_median\`:
+
+  Median-centred coefficient (or the original \`effect_size\` if
+  \`subtract_median = FALSE\`).
+
+- \`pval_median\`:
+
+  Two-sided p-value from the median-comparison test.
+
+## Details
+
+For every distinct value in \`metadata\` the algorithm
+
+1.  keeps coefficients with \`pval \< p_cutoff\` and computes their
+    median;
+
+2.  simulates \`n_sims\` draws of coefficients using a normal
+    approximation (\`N(effect_size, stderr^2)\`) and records the
+    empirical distribution of the simulated medians;
+
+3.  derives a variance-inflated \*offset\* that accounts for the
+    covariance between each coefficient and the group median;
+
+4.  performs a two-sided Z-test of \`H0 : beta_i = offset_i\`, returning
+    the resulting p-value in \`pval_median\`.
+
+## Warning
+
+The procedure is heuristic and relies on normal approximations. Results
+may be unstable for very small sample sizes or when \`stderr\` values
+are zero or missing.
+
+## Attribution
+
+The simulation and covariance-adjustment code is adapted from MaAsLin 3
+by William Nickols and Jacob Nearing, distributed under the MIT license.
+Copyright 2025 Harvard School of Public Health. The upstream notice is
+included in the package's COPYRIGHTS file.
+
+## See also
+
+\[MaAsLin 3 GitHub\](https://github.com/biobakery/maaslin3)
+
+## Examples
+
+``` r
+toy <- data.frame(
+    taxon = c("tax1", "tax2"),
+    metadata = c("grp", "grp"),
+    effect_size = c(0.4, 0.2),
+    pval = c(0.01, 0.2),
+    stderr = c(0.1, 0.1),
+    qval = c(0.02, 0.25)
+)
+median_comparison_tweedie(toy, n_sims = 100)
+#>   taxon metadata effect_size pval stderr qval pval_median coef_median
+#> 1  tax1      grp         0.4 0.01    0.1 0.02   0.1409576         0.4
+#> 2  tax2      grp         0.2 0.20    0.1 0.25   0.1892699         0.2
+```

@@ -1,0 +1,9 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  Tweedieverse: Tweedieverse.html
+last_built: 2026-11-21T21:00Z
+urls:
+  reference: https://himelmallick.github.io/Tweedieverse/reference
+  article: https://himelmallick.github.io/Tweedieverse/articles
