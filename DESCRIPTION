@@ -1,7 +1,7 @@
 Package: Tweedieverse
 Title: Differential Analysis of Omics Data Based on the Tweedie Distribution
-Version: 0.99.2
-Date: 2026-11-20
+Version: 0.99.3
+Date: 2026-11-21
 Authors@R: c(
     person("Nalin", "Arora", email = "naa4050@med.cornell.edu", role = c(
         "aut", "cre"), comment = c(ORCID = "0009-0009-1340-688X")),

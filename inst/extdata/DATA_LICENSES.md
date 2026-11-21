@@ -13,18 +13,12 @@ nonumi_sce.rds, and franzosa_example_mae.rds), under the same licence.
 | nonumi_sce | Tabula Muris Smart-seq2 FACS brain counts, Figshare v8 | CC BY 4.0 |
 | franzosa_example_mae | A subset of the HuMMANet v1 FranzosaE_2019 data | CC BY 4.0 |
 
-## FransozaE_2019_MAE.RData
-
-This file contains FranzosaE_2019_data, a list holding one MultiAssayExperiment
-with 155 samples, 711 microbial features, and 339 metabolites. It is reconstructed
-from the HuMMANet v1 data archive, distributed under CC BY 4.0.
-
-The vignette subset retains 16 samples and four features from each assay.
-Both files preserve the source assay values. Container conversion, annotation
+The Franzosa vignette object retains 16 samples and four features from each
+assay. It preserves the source assay values. Container conversion, annotation
 matching, and subsetting are documented in inst/scripts/README.md and
 inst/scripts/rebuild_example_data.R.
 
-## Attribution for the HuMMANet-derived objects
+## Attribution for the HuMMANet-derived example
 
 Credit Shivangi Verma, Nalin Arora, Himel Mallick, and Tarini Shankar Ghosh
 (2026), HuMMANet v1, https://doi.org/10.5281/zenodo.22053943.

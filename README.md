@@ -1,524 +1,215 @@
-Tweedieverse: Differential Analysis of Omics Data Based on the Tweedie Distribution
-================
-Nalin Arora, Ziyu Liu, Ali Rahnavard,Himel Mallick
-<img src="docs/logo.jpg" align="right" width="365px"/>
+# Tweedieverse
 
-- [Introduction](#introduction)
-- [Installation](#installation)
-- [What Tweedieverse Fits](#what-tweedieverse-fits)
-- [Domain-Specific Normalization and Offsets](#domain-specific-normalization-and-offsets)
-- [Tweedie Variance Power](#tweedie-variance-power)
-- [MaAsLin2 Linear Model Option](#maaslin2-linear-model-option)
-- [Median Comparison](#median-comparison)
-- [Presence-Absence Model and CCT Ranking](#presence-absence-model-and-cct-ranking)
-- [Method-Specific Arguments](#method-specific-arguments)
-- [Basic Usage](#basic-usage)
-- [Input](#input)
-- [Output](#output)
-- [Getting Started with Tweedieverse](#getting-started-with-tweedieverse)
-- [Citation](#citation)
-- [Issues](#issues)
+<img src="docs/logo.jpg" align="right" width="200" alt="Tweedieverse logo"/>
 
-Introduction
-------------
+**Differential analysis of omics data using Tweedie models.**
 
-Tweedieverse is an R package for differential analysis of omics data using generalized linear models built around the [Tweedie distribution](https://en.wikipedia.org/wiki/Tweedie_distribution).
+Tweedieverse fits one model per feature, supports multiple covariates and
+optional random effects, and returns association tables with effect estimates
+and adjusted p-values. It accepts microbiome, single-cell, bulk RNA-seq, and
+other omics measurements through Bioconductor containers.
 
-The package is designed for high-throughput data types where the outcome can be counts, non-negative continuous measurements, sparse measurements with many zeros, or approximately continuous abundance-like values. This includes microbiome taxonomic or functional profiles, bulk and single-cell RNA-seq measurements, metabolomics peak intensities, and other omics tables where many features are tested against the same metadata.
+[Input](#input) · [Quick start](#quick-start) · [Output](#output) ·
+[Model options](#model-options) · [Multi-omics](#multi-omics) ·
+[Documentation](#documentation-and-example-data)
 
-Tweedieverse fits one model per feature, extracts coefficient-level inference for each metadata variable, adjusts p-values across tested associations, and returns a ranked results table. It supports multiple covariates, optional random effects, configurable Tweedie variance powers, optional MaAsLin2 linear modeling for the normal case, optional median-comparison adjustment, and optional presence-absence logistic regression with Cauchy combination test ranking.
-
-Installation
-------------
+## Installation
 
 Install the development version from GitHub:
 
 ```r
 install.packages("devtools")
 devtools::install_github("himelmallick/Tweedieverse")
-library(Tweedieverse)
 ```
 
-MaAsLin2 is an imported dependency because it is the default engine for the `tweedie_p = 0` linear-model path. Standard package installation will install required dependencies.
+## Input
 
-What Tweedieverse Fits
-----------------------
+Supply a container whose assay has **features in rows and samples in columns**.
+Sample covariates belong in `colData`; sample identifiers are used to align the
+assay and metadata. Select the assay with `assay_name` (default `"counts"`).
 
-The main function is `Tweedieverse()`. At a high level, it:
-
-1. extracts the selected assay and aligns it with container metadata,
-2. filters features by abundance, prevalence, and variance,
-3. builds a per-feature model formula from the selected metadata,
-4. fits one model per feature,
-5. returns coefficient estimates, standard errors, p-values, q-values, prevalence summaries, and model labels.
-
-The default base model is `CPLM`, using compound Poisson Tweedie modeling for abundance-style outcomes. The default `tweedie_p = NULL` lets the model estimate the Tweedie index in the usual compound Poisson range between 1 and 2 when all filtered feature values are non-negative.
-
-Domain-Specific Normalization and Offsets
------------------------------------------
-
-Tweedieverse normalization is **offset-only**. The input feature table is not normalized, divided, log-transformed, or otherwise replaced by the normalization step. Instead, `domain` and `normalization` are used to estimate a sample-level size factor, and that size factor enters the model as:
-
-```r
-offset(log(size_factor))
-```
-
-The response remains on the original input scale:
-
-```r
-raw_feature_value ~ metadata + offset(log(size_factor))
-```
-
-Domain defaults and supported strategies are:
-
-| Domain | Default | Supported normalization strategies |
+| Data / `domain` | Preferred container | Default normalization |
 | --- | --- | --- |
-| `microbiome` | `TSS` | `TSS`, `GMPR`, `CSS`, `MEDIAN`, `NONE` |
-| `single_cell` | `SCRAN` | `SCRAN`, `MEDIAN`, `NONE` |
-| `bulk_rnaseq` | `TMM` | `TMM`, `RLE` / `DESEQ2`, `CPM`, `MEDIAN`, `NONE` |
-| `custom` / other omics | `MEDIAN` | all supported strategies |
+| Microbiome / `"microbiome"` | `TreeSummarizedExperiment` | `TSS` |
+| Single-cell / `"single_cell"` | `SingleCellExperiment` | `SCRAN` |
+| Bulk RNA-seq / `"bulk_rnaseq"` | `SummarizedExperiment` | `TMM` |
+| Other omics / `"custom"` | A supported SummarizedExperiment-like container | `MEDIAN` |
 
-Examples below use these packaged containers and the Bioconductor `airway`
-dataset. Each assay has features in rows and samples in columns; metadata are
-stored in `colData`.
+For multiple assays, use a `MultiAssayExperiment` (see [below](#multi-omics)).
+To use your own count matrix and metadata, first wrap them in a supported
+container. Plain feature tables, matrices, lists, and file paths are not accepted
+as `input_features`. An optional `input_metadata` data frame can override
+container metadata.
+
+## Quick start
+
+This example uses packaged PBMC3k UMI counts: 20 genes across 60 CD4/CD8 cells.
+The library-size column was calculated from all source genes before subsetting.
 
 ```r
 library(Tweedieverse)
 
-microbiome_tse <- readRDS(system.file(
-  "extdata", "microbiome_tse.rds", package = "Tweedieverse"
-))
 umi_sce <- readRDS(system.file(
-  "extdata", "umi_sce.rds", package = "Tweedieverse"
+    "extdata", "umi_sce.rds", package = "Tweedieverse"
 ))
-data("airway", package = "airway")
-airway_counts <- SummarizedExperiment::assay(airway, "counts")
-top_genes <- order(rowSums(airway_counts), decreasing = TRUE)[seq_len(20)]
-bulk_rnaseq_se <- airway[top_genes, ]
-```
-
-The HMP2 microbiome container holds relative abundances, so use
-`normalization = "NONE"` for that example. The TSS/GMPR calls below illustrate
-alternative offset choices; for raw microbiome counts, replace `microbiome_tse`
-with a count-containing `TreeSummarizedExperiment`.
-
-Examples:
-
-```r
-# Explicit TSS-derived size factors as model offsets.
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "TSS",
-  output = NULL,
-  domain = "microbiome",
-  fixed_effects = "diagnosis"
-)
-
-# Microbiome GMPR size factors. The feature table is still untouched.
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  output = NULL,
-  domain = "microbiome",
-  normalization = "GMPR",
-  fixed_effects = "diagnosis"
-)
-
-# Bulk RNA-seq median-ratio size factors.
-fit <- Tweedieverse(
-  input_features = bulk_rnaseq_se,
-  output = NULL,
-  domain = "bulk_rnaseq",
-  normalization = "RLE",
-  fixed_effects = "dex"
-)
-
-# Use the full-library size column stored in colData(umi_sce).
-fit <- Tweedieverse(
-  input_features = umi_sce,
-  output = NULL,
-  domain = "single_cell",
-  scale_factor = "library_size",
-  fixed_effects = "CellType"
-)
-```
-
-`scale_factor` always overrides `domain` and `normalization`. Set `adjust_offset = FALSE` to fit without a model offset.
-
-Tweedie Variance Power
-----------------------
-
-The `tweedie_p` argument controls the Tweedie variance power:
-
-| `tweedie_p` | Interpretation | Tweedieverse behavior |
-| --- | --- | --- |
-| `NULL` | Estimated compound Poisson Tweedie index, usually `1 < p < 2` | Default CPLM path |
-| `0` | Normal variance case | MaAsLin2 linear model by default, or Tweedie GLM when `Maaslin2_run = FALSE` |
-| `1` | Poisson | Fixed-power Tweedie GLM for fixed effects; Poisson GLMM for random effects |
-| `(1, 2)` | Compound Poisson with non-negative mass at zero | Estimated by default when `tweedie_p = NULL`; fixed values can be passed for fixed-effect GLMs |
-| `2` | Gamma | Fixed-power Tweedie GLM for fixed effects; Gamma GLMM for random effects |
-| `3` | Inverse Gaussian | Fixed-power Tweedie GLM for fixed effects; inverse Gaussian GLMM for random effects |
-| `> 2` | Stable positive-support variance powers | Fixed-power Tweedie GLM for fixed effects |
-
-The index is resolved after the feature table has been oriented, aligned with metadata, and filtered. `tweedie_p = NA` is treated the same as `tweedie_p = NULL`.
-
-Values between 0 and 1 are undefined and are rejected. Negative supplied Tweedie powers are allowed for non-negative data with a warning, but they require strictly positive fitted means. Negative feature values are supported only at `p = 0`. If `tweedie_p` is left unspecified and the filtered data contain negative values, Tweedieverse resolves the index to `p = 0`, the Gaussian case.
-
-When the resolved index is `p = 0`, Tweedieverse automatically uses `link = "identity"` and disables the log-offset because log, sqrt, and inverse links are not appropriate for responses that can span the negative half line.
-
-For random-effects models, fixed powers are supported at `p = 0`, `p = 1`, `1 < p < 2`, `p = 2`, and `p = 3`. Fixed random-effect powers inside `(1, 2)` are pinned in `glmmTMB`; boundary values use the corresponding Gaussian, Poisson, Gamma, or inverse Gaussian family.
-
-For `p = 0`, Tweedieverse can optionally transform a **copy** of the filtered feature table for the Gaussian abundance model:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = "demo_output/p0_log",
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  p0_transform = "LOG",
-  p0_transform_pseudocount = 1
-)
-```
-
-Supported `p0_transform` values are:
-
-| `p0_transform` | Behavior |
-| --- | --- |
-| `NONE` | Use the filtered feature table as-is |
-| `CLR` | Centered log-ratio transform with `p0_transform_pseudocount` |
-| `RCLR` | Robust CLR using positive values only; zeros remain zero |
-| `LOG` | `log(x + p0_transform_pseudocount)` |
-| `ARC_SIGNED_SQRT` | `sign(x) * sqrt(abs(x))` |
-
-The original input object is not modified. When `output` is provided and a non-`NONE` transform is used, the analysis copy is written to `transformed_features.tsv`.
-
-MaAsLin2 Linear Model Option
-----------------------------
-
-For `tweedie_p = 0`, MaAsLin2 is the default:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  Maaslin2_run = TRUE
-)
-```
-
-This route uses MaAsLin2's linear-model workflow and returns MaAsLin2-labeled results with `tweedie.index = 0`.
-
-MaAsLin2 can also be used together with Tweedieverse median comparison by explicitly enabling `median_comparison`:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  Maaslin2_run = TRUE,
-  median_comparison = TRUE,
-  median_subtraction = TRUE
-)
-```
-
-To force the Tweedie GLM implementation for the same normal variance power, set `Maaslin2_run = FALSE`:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  Maaslin2_run = FALSE,
-  link = "identity"
-)
-```
-
-Median Comparison
------------------
-
-`median_comparison` is optional and defaults to `FALSE`.
-
-When enabled, Tweedieverse compares fitted coefficients against a metadata-specific median effect rather than the default null of zero. This can be useful for relative-abundance or compositional settings where a global shift in coefficients may be expected.
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  median_comparison = TRUE,
-  median_subtraction = TRUE
-)
-```
-
-When `median_comparison = TRUE`, the returned `coef`, `pval`, and `qval` columns are replaced by the median-comparison adjusted values.
-
-The median-comparison calculation uses Monte Carlo simulations. Set
-`median_comparison_seed = 123` for reproducible simulations, or use
-`seed = 123` when calling `median_comparison_tweedie()` directly.
-The supplied seed is scoped with `withr`, which restores the preceding
-random-number state after this calculation. The default `NULL` uses the
-current random-number stream, so repeated results can vary.
-
-Presence-Absence Model and CCT Ranking
---------------------------------------
-
-Tweedieverse can also fit a presence-absence logistic regression model in addition to the abundance model:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  run_presence_absence_model = TRUE
-)
-```
-
-The presence-absence model tests whether each feature is detected (`feature > 0`) as a function of the metadata. When `run_presence_absence_model = TRUE`, Tweedieverse runs this logistic model alongside the selected abundance model, including the MaAsLin2 abundance path used by default for `tweedie_p = 0`. Tweedieverse keeps the individual abundance-model and presence-absence-model p-values, then combines them with a Cauchy combination test (CCT) to produce a joint ranking.
-
-By default, the presence-absence model requires at least three detected samples and three undetected samples per feature, counting samples with observed abundances and model covariates. Set `min_presence_absence_count` to change both minimums. For example, `min_presence_absence_count = 1` allows a fit when at least one sample is detected and one is undetected. Retained features below either minimum have `pval_presence = NA` and use the abundance p-value directly.
-
-If the two reported p-values are exactly 0 and 1, the combined p-value is 0. The selected multiple-testing correction is applied across the resulting p-values to compute the joint q-values.
-
-The combined output includes columns such as:
-
-- `pval_abundance` and `qval_abundance`
-- `pval_presence` and `qval_presence`
-- `base.model_abundance`
-- `base.model_presence`
-- combined `pval`, `qval`, and `base.model = "CCT"`
-
-For example, this runs MaAsLin2 for the `p = 0` abundance model, then also runs the presence-absence logistic regression model and reports the CCT joint ranking:
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  Maaslin2_run = TRUE,
-  run_presence_absence_model = TRUE
-)
-```
-
-Method-Specific Arguments
--------------------------
-
-Use `method_args` to pass options to method-specific engines. The main current use is forwarding MaAsLin2 options when `tweedie_p = 0` and `Maaslin2_run = TRUE`.
-
-```r
-fit <- Tweedieverse(
-  input_features = microbiome_tse,
-  normalization = "NONE",
-  output = NULL,
-  fixed_effects = "diagnosis",
-  tweedie_p = 0,
-  method_args = list(
-    Maaslin2 = list(
-      normalization = "NONE",
-      transform = "NONE"
-    )
-  )
-)
-```
-
-The alias `method.args` is also supported for compatibility, but only one of `method_args` or `method.args` should be supplied in a single call.
-
-Parallel Execution
-------------------
-
-Tweedieverse uses `BiocParallel` for feature-wise model fitting.
-By default it uses `BiocParallel::SerialParam()`, which is the safest backend
-for examples, tests, and Bioconductor checks.
-
-Users who want parallel execution can pass a `BPPARAM` object:
-
-```r
-fit <- Tweedieverse(
-  input_features = umi_sce,
-  output = NULL,
-  domain = "single_cell",
-  scale_factor = "library_size",
-  fixed_effects = "CellType",
-  BPPARAM = BiocParallel::SnowParam(workers = 4, type = "SOCK")
-)
-```
-
-Basic Usage
------------
-
-```r
-library(Tweedieverse)
 
 fit <- Tweedieverse(
-  input_features = umi_sce,
-  output = NULL,
-  domain = "single_cell",
-  scale_factor = "library_size",
-  fixed_effects = "CellType"
-)
-```
-
-A small reproducible example:
-
-```r
-set.seed(123)
-
-features <- as.data.frame(matrix(rpois(60, lambda = 5), nrow = 20, ncol = 3))
-colnames(features) <- paste0("feature", seq_len(ncol(features)))
-rownames(features) <- paste0("sample", seq_len(nrow(features)))
-
-metadata <- data.frame(
-  group = rep(c("A", "B"), each = 10),
-  row.names = rownames(features)
-)
-
-experiment <- SummarizedExperiment::SummarizedExperiment(
-  assays = list(counts = t(as.matrix(features))),
-  colData = metadata
-)
-
-fit <- Tweedieverse(
-  input_features = experiment,
-  output = NULL,
-  fixed_effects = "group",
-  tweedie_p = 1,
-  median_comparison = FALSE,
-  max_significance = 1
+    input_features = umi_sce,
+    output = NULL,
+    assay_name = "counts",
+    domain = "single_cell",
+    fixed_effects = "CellType",
+    reference = "CellType,CD8",
+    scale_factor = "library_size",
+    tweedie_p = 1,
+    return_all = TRUE
 )
 
 head(fit)
+discoveries <- subset(fit, !is.na(qval) & qval <= 0.05)
 ```
 
-Input
------
+The example fixes `p = 1` to illustrate the Poisson variance case. Leaving
+`tweedie_p = NULL` estimates a compound Poisson-gamma power for each feature.
+This is a cell-type illustration from one donor; population-level inference
+requires biological replication and an appropriate study design.
 
-Tweedieverse requires a Bioconductor experiment container.
+## Output
 
-The assay should contain omics features such as taxa, genes, transcripts, pathways, metabolites, or peaks. The container's `colData` should contain the sample-level variables to test. Sample identifiers must overlap between the assay and metadata; Tweedieverse will align them before fitting models.
+For a single assay, `Tweedieverse()` returns a `data.frame`, ordered by q-value.
+By default, it returns associations with `qval <= max_significance` (0.05).
+Use `return_all = TRUE` to inspect the full available table, including with
+`output = NULL`. Missing q-values are excluded from significance selection.
 
-`input_features` can be:
-
-- a domain-appropriate Bioconductor container,
-- a `MultiAssayExperiment` containing multiple omics layers.
-
-The domain-specific Bioconductor container expectations are:
-
-| Domain | Preferred container |
+| Columns | Meaning |
 | --- | --- |
-| `microbiome` | `TreeSummarizedExperiment` |
-| `single_cell` | `SingleCellExperiment` |
-| `bulk_rnaseq` | `SummarizedExperiment` |
-| `custom` | any supported SummarizedExperiment-like container |
+| `feature`, `metadata`, `value` | Feature, covariate, and tested level or predictor |
+| `coef`, `stderr` | Coefficient and standard error on the model's link scale |
+| `pval`, `qval` | Test p-value and adjusted p-value; correction defaults to BH |
+| `base.model`, `tweedie.index` | Model label and fitted or fixed variance power |
+| `N`, `N.not.zero`, `percent.zero` | Aligned sample count, positive measurements, and rounded percentage of zeros |
 
-When a Bioconductor object is supplied, `assay_name` selects the assay to use, and `colData` is used as metadata unless `input_metadata` is provided separately as a data frame. Plain feature data frames, matrices, lists, and file paths are not accepted as `input_features`.
+In the quick start, `CellType` coefficients compare CD4 with CD8. With the
+log link, a positive coefficient indicates a higher fitted mean in CD4 cells,
+and `exp(coef)` is the mean ratio at equal library size. Continuous covariates
+are standardized by default; use `standardize = FALSE` for their original units.
 
-Assays must have features in rows and samples in columns. Sample column names are matched to metadata row names. Sparse assays are preserved through filtering and Tweedie model fitting, with each feature extracted individually. The default single-cell `SCRAN` normalization receives sparse counts directly. MaAsLin2, the edgeR backend for `TMM`, and `p0_transform` operations other than `"NONE"` require a dense feature table. Optional association plots convert the selected features to dense data for plotting.
+Set `output` to a directory to write `all_results.tsv`,
+`significant_results.tsv`, logs, and model-index plots. Add
+`plot_heatmap = TRUE` or `plot_scatter = TRUE` for optional association plots.
+`output = NULL` creates no output directory or files.
 
-### Multi-omics input with `MultiAssayExperiment`
+## Model options
 
-Each experiment/omics layer is analyzed independently and returned as a named
-list of tables. This example uses `return_all = TRUE` to inspect results even
-when no associations pass the default significance threshold. Arguments can be single values or named lists/vectors keyed by
-experiment name. Use a list when a layer needs `NULL`.
+### Variance power
+
+| `tweedie_p` | Model choice |
+| --- | --- |
+| `NULL` | Estimate a feature-specific compound Poisson-gamma power, `1 < p < 2`, for non-negative data |
+| `0` | Gaussian case; MaAsLin2 linear modeling by default |
+| `1` | Poisson variance case |
+| Between `1` and `2` | Fixed compound Poisson-gamma power |
+| `2` | Gamma variance case |
+| `3` | Inverse Gaussian variance case |
+
+The default link is log. At `p = 0`, the package uses an identity link and
+disables log offsets. Negative measurements require `p = 0`; an unspecified
+power resolves to zero when negative values remain after filtering. Powers
+between zero and one are undefined. See the function help for other supported
+powers and random-effect restrictions.
+
+At `p = 0`, use `Maaslin2_run = FALSE` to select the Tweedie GLM implementation.
+Optional `p0_transform` choices are `NONE`, `CLR`, `RCLR`, `LOG`, and
+`ARC_SIGNED_SQRT`. These operate on an analysis copy of the feature matrix.
+
+### Normalization and offsets
+
+Normalization estimates sample size factors and enters them as
+`offset(log(size_factor))`; it does not divide or replace the response matrix.
+Choose a strategy with `normalization`, supply a `colData` column with
+`scale_factor`, or disable offsets with `adjust_offset = FALSE`.
+A supplied `scale_factor` overrides the normalization strategy.
+
+For already scaled relative abundances, use `normalization = "NONE"`.
+Filtering uses `abd_threshold`, `prev_threshold`, and `var_threshold`;
+`entropy_threshold` controls metadata filtering.
+
+Sparse assays are preserved through filtering and Tweedie fitting. MaAsLin2,
+the edgeR TMM backend, selected transformations, and association plots can
+require dense representations; see the tutorial for details.
+
+### Optional analyses
+
+- **Presence/absence:** set `run_presence_absence_model = TRUE` to combine
+  abundance and prevalence evidence using a Cauchy combination test. By default,
+  prevalence fitting requires at least three detected and three undetected
+  samples; adjust this with `min_presence_absence_count`. Below either minimum,
+  `pval_presence` is missing and the abundance p-value is used directly. Exact
+  component p-values of 0 and 1 combine to 0. Component results are retained
+  alongside the joint p-value and q-value; `coef` remains the abundance effect.
+- **Median comparison:** for relative-abundance analyses, enable
+  `median_comparison = TRUE` to test effects against a covariate-specific median.
+  Set `median_comparison_seed` for reproducible Monte Carlo calculations. A
+  supplied seed restores the previous RNG state afterward.
+- **Study design and execution:** use `fixed_effects`, `random_effects`, and
+  `reference` to specify the design, `method_args` for engine-specific options,
+  and `BPPARAM` for BiocParallel execution. The default backend is serial.
+
+## Multi-omics
+
+A `MultiAssayExperiment` returns a named list of association tables, each with
+an `omics` column. Layers are fitted independently and q-values are adjusted
+within each layer. Sample alignment uses `sampleMap`.
 
 ```r
 mae <- readRDS(system.file(
-  "extdata", "franzosa_example_mae.rds", package = "Tweedieverse"
+    "extdata", "franzosa_example_mae.rds", package = "Tweedieverse"
 ))
-fit <- Tweedieverse(
-  input_features = mae,
-  output = NULL,
-  return_all = TRUE,
-  assay_name = "abundance",
-  fixed_effects = c("diseaseCat_clean", "Age"),
-  domain = c(
-    taxaAbundanceProfile = "microbiome",
-    harmonizedMetaboliteProfile = "custom"
-  ),
-  normalization = c(
-    taxaAbundanceProfile = "NONE",
-    harmonizedMetaboliteProfile = "MEDIAN"
-  ),
-  tweedie_p = list(
-    taxaAbundanceProfile = NULL,
-    harmonizedMetaboliteProfile = NULL
-  ),
-  run_presence_absence_model = c(
-    taxaAbundanceProfile = TRUE,
-    harmonizedMetaboliteProfile = FALSE
-  )
+
+multi_fit <- Tweedieverse(
+    input_features = mae,
+    output = NULL,
+    assay_name = "abundance",
+    fixed_effects = c("diseaseCat_clean", "Age"),
+    domain = c(
+        taxaAbundanceProfile = "microbiome",
+        harmonizedMetaboliteProfile = "custom"
+    ),
+    normalization = c(
+        taxaAbundanceProfile = "NONE",
+        harmonizedMetaboliteProfile = "MEDIAN"
+    ),
+    return_all = TRUE
 )
 
-names(fit)
-head(fit$taxaAbundanceProfile)
-head(fit$harmonizedMetaboliteProfile)
+names(multi_fit)
+head(multi_fit$taxaAbundanceProfile)
 ```
 
-Output
-------
+Most arguments accept a shared value or named values keyed by layer. Use a named
+list when a layer needs `NULL`, such as a mix of estimated and fixed powers.
 
-By default, the returned table contains associations with `qval <= max_significance`.
-Set `return_all = TRUE` to retrieve the full table corresponding to
-`all_results.tsv`, including with `output = NULL`. This also applies to each
-omics layer in a `MultiAssayExperiment`. The return type is a data frame.
-Rows with missing q-values after median comparison appear in the full table
-and are excluded from the significant results. Files and optional plots use
-`max_significance` to select significant associations.
+## Documentation and example data
 
-For single-omics input, `Tweedieverse()` returns a data frame ordered by increasing q-value. For `MultiAssayExperiment` input, it returns a named list of omics-specific data frames, each with an `omics` column. The main columns are:
-
-- `feature`: the tested feature,
-- `metadata`: the metadata variable,
-- `value`: the coefficient level or contrast,
-- `coef`: coefficient estimate,
-- `stderr`: standard error,
-- `pval`: p-value,
-- `qval`: multiple-testing adjusted p-value,
-- `base.model`: model used for the reported ranking,
-- `tweedie.index`: estimated or fixed Tweedie variance power,
-- `N`: number of samples,
-- `N.not.zero`: number of nonzero samples,
-- `percent.zero`: percent zero values.
-
-When `run_presence_absence_model = TRUE`, additional abundance-specific and presence-specific columns are returned so the joint CCT ranking can be inspected alongside the individual model results.
-
-Getting Started with Tweedieverse
----------------------------------
-
-See the package vignette for Bioconductor-container examples covering microbiome relative abundances, single-cell RNA-seq UMI counts, single-cell RNA-seq non-UMI/read counts, pseudobulk RNA-seq aggregation with `muscat`, bulk RNA-seq counts from the Bioconductor `airway` dataset, and `MultiAssayExperiment` input:
+The [tutorial](vignettes/Tweedieverse.Rmd) covers microbiome abundances, UMI and
+non-UMI single-cell data, pseudobulk aggregation with muscat, bulk RNA-seq with
+airway, multi-omics analysis, result interpretation, and visualization.
 
 ```r
 vignette("Tweedieverse", package = "Tweedieverse")
-```
-
-For full function options, see:
-
-```r
 ?Tweedieverse
 ```
 
-Citation
---------
+Packaged examples run without downloads. See the
+[data provenance and licences](inst/extdata/DATA_LICENSES.md) and
+[preparation instructions](inst/scripts/README.md) for their sources and
+reconstruction steps.
 
-To cite **Tweedieverse** in publications, please use:
+## Citation and support
 
-Mallick, H, Chatterjee, S, Chowdhury, S, Chatterjee, S, Rahnavard, A, Hicks, SC. [Differential expression of single-cell RNA-seq data using Tweedie models](https://onlinelibrary.wiley.com/doi/10.1002/sim.9430). Statistics in Medicine. 2022; 41(18): 3492-3510. doi:10.1002/sim.9430
+Mallick H et al. (2022). [Differential expression of single-cell RNA-seq data
+using Tweedie models](https://doi.org/10.1002/sim.9430).
+*Statistics in Medicine*, 41(18), 3492–3510.
 
-To cite the **Tweedieverse** software, please use:
-
-Mallick H et al. (2021). [Tweedieverse - A Unified Statistical Framework for Differential Analysis of Multi-omics Data](https://github.com/himelmallick/Tweedieverse). R package, <https://github.com/himelmallick/Tweedieverse>.
-
-Issues
-------
-
-We are happy to troubleshoot issues with the package. Please contact the maintainer by email or [open an issue](https://github.com/himelmallick/Tweedieverse/issues) in the GitHub repository.
+Use `citation("Tweedieverse")` for the package citation. Please report problems
+through [GitHub issues](https://github.com/himelmallick/Tweedieverse/issues).

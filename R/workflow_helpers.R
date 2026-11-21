@@ -758,25 +758,23 @@ write_tweedieverse_results <- function(
     )
 }
 
-plot_tweedieverse_index <- function(ordered_results, figures_folder, output) {
-    logging::loginfo("Writing Tweedie inxed plot to file: %s", output)
+plot_tweedieverse_index <- function(ordered_results, figures_folder) {
+    logging::loginfo(
+        "Writing Tweedie index plots to folder: %s", figures_folder
+    )
     tryCatch(
         {
             tweedie_index_plot(ordered_results, figures_folder)
         },
         error = function(err) {
-            logging::logerror(paste0(
-                "Unable to do make a Tweedie inxed plot ",
-                "of results!!!"
-            ))
+            logging::logerror("Unable to create Tweedie index plots.")
             logging::logerror(err)
         }
     )
 }
 
 plot_tweedieverse_heatmap <- function(
-    significant_results, figures_folder, output,
-    options
+    significant_results, figures_folder, options
 ) {
     significant_results_file <- file.path(options$output,
         "significant_results.tsv")
@@ -796,7 +794,7 @@ plot_tweedieverse_heatmap <- function(
                 )
             },
             error = function(err) {
-                logging::logerror("Unable to do make a hetamp of results!!!")
+                logging::logerror("Unable to create a heatmap of results.")
                 logging::logerror(err)
             }
         )
@@ -805,7 +803,7 @@ plot_tweedieverse_heatmap <- function(
 
 plot_tweedieverse_associations <- function(
     metadata, final_features, significant_results,
-    offset, figures_folder, output, options
+    offset, figures_folder, options
 ) {
     significant_results_file <- file.path(options$output,
         "significant_results.tsv")
@@ -845,14 +843,13 @@ output_tweedieverse_results <- function(
             ordered_results, significant_results, options$output,
             options$max_significance
         )
-        plot_tweedieverse_index(ordered_results, figures_folder, options$output)
+        plot_tweedieverse_index(ordered_results, figures_folder)
         plot_tweedieverse_heatmap(
-            significant_results, figures_folder, options$output,
-            options
+            significant_results, figures_folder, options
         )
         plot_tweedieverse_associations(
             metadata, final_features, significant_results,
-            offset, figures_folder, options$output, options
+            offset, figures_folder, options
         )
     }
     if (options$return_all) {

@@ -138,18 +138,18 @@ The reconstruction script performs the following steps.
    without additional normalization, transformation, or imputation.
 4. Create microbial row annotations from feature names and match metabolite
    annotations to metaboliteIdentifierMapping by Query_Name.
-5. Wrap the 711 microbial features and 339 metabolites in
-   SummarizedExperiment objects and a MultiAssayExperiment.
-6. Save this object inside the list FranzosaE_2019_data as
-   FransozaE_2019_MAE.RData. The historical filename spelling is retained.
-7. Select the explicitly listed 16 samples and four features per layer for the
-   vignette. Keep diseaseCat_clean and Age in primary colData, while retaining
-   the layer annotations and metadata. Save franzosa_example_mae alongside the
-   three real-data containers in tweedieverse_data.RData.
+5. Wrap the original 711 microbial features and 339 metabolites in
+   SummarizedExperiment objects for selecting the vignette subset.
+6. Select the explicitly listed 16 samples and four features per layer. Keep
+   diseaseCat_clean and Age in primary colData, while retaining layer
+   annotations and metadata, and combine the subsets in a MultiAssayExperiment.
+7. Save franzosa_example_mae.rds and include the same object alongside the
+   three single-assay containers in tweedieverse_data.RData. The unused full
+   MultiAssayExperiment bundle is no longer distributed or generated.
 
 The reconstructed assay values, annotations, and metadata were checked against
-both existing bundled RData files. This recovers a reproducible construction
-from a verified public source. The Git history does not record the original
-download command used in 2026.
+the bundled vignette objects. This provides a reproducible construction from a
+verified public source. The Git history does not record the original download
+command used in 2026.
 
 See inst/extdata/DATA_LICENSES.md for the licence of each bundled object.

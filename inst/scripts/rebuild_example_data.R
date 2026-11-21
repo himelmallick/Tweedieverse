@@ -241,18 +241,6 @@ layers <- lapply(layer_names, function(layer_name) {
     )
 })
 names(layers) <- layer_names
-FranzosaE_2019_data <- list(
-    FranzosaE_2019 = MultiAssayExperiment::MultiAssayExperiment(
-        experiments = layers, colData = study_metadata
-    )
-)
-# Preserve the historical filename spelling for existing source references.
-save(
-    FranzosaE_2019_data,
-    file = file.path(output_dir, "FransozaE_2019_MAE.RData"),
-    compress = "xz", version = 2
-)
-
 # Fixed, compact vignette subset: eight gastrointestinal and eight healthy
 # samples, four microbial species, and four metabolites. Selection is explicit
 # and independent of model results. Layer annotations and metadata are retained.

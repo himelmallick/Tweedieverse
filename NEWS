@@ -1,3 +1,12 @@
+Changes in version 0.99.3 (2026-11-21):
+* Correct log messages for Tweedie index and heatmap plots, and remove redundant
+  output arguments from internal plot helpers and their callers.
+* Remove the unused full Franzosa MultiAssayExperiment RData file and its
+  generation code. Retain the compact vignette example and its provenance.
+* Condense and reorganize the README around supported inputs, a runnable
+  example, and result interpretation, with detailed options in the vignette
+  and function documentation.
+
 Changes in version 0.99.2 (2026-11-20):
 * Split .Tweedieverse_single() into a short function and explicit
   helpers for validation, input extraction, sample alignment, reference levels,
