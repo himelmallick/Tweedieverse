@@ -1,6 +1,4 @@
-# Tweedieverse
-
-<img src="docs/logo.jpg" align="right" width="200" alt="Tweedieverse logo"/>
+# Tweedieverse <img src="man/figures/logo.png" align="right" height="139" alt="Tweedieverse logo" />
 
 **Differential analysis of omics data using Tweedie models.**
 
@@ -203,7 +201,7 @@ list when a layer needs `NULL`, such as a mix of estimated and fixed powers.
 
 ## Documentation and example data
 
-The [tutorial](vignettes/Tweedieverse.Rmd) covers microbiome abundances, UMI and
+The [tutorial](https://himelmallick.github.io/Tweedieverse/articles/Tweedieverse.html) covers microbiome abundances, UMI and
 non-UMI single-cell data, pseudobulk aggregation with muscat, bulk RNA-seq with
 airway, multi-omics analysis, result interpretation, and visualization.
 
@@ -213,8 +211,8 @@ vignette("Tweedieverse", package = "Tweedieverse")
 ```
 
 Packaged examples run without downloads. See the
-[data provenance and licences](inst/extdata/DATA_LICENSES.md) and
-[preparation instructions](inst/scripts/README.md) for their sources and
+[data provenance and licences](https://github.com/himelmallick/Tweedieverse/blob/master/inst/extdata/DATA_LICENSES.md) and
+[preparation instructions](https://github.com/himelmallick/Tweedieverse/blob/master/inst/scripts/README.md) for their sources and
 reconstruction steps.
 
 ## Citation and support

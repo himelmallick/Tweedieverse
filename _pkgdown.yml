@@ -1,0 +1,38 @@
+url: https://himelmallick.github.io/Tweedieverse/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    primary: "#0E2A47"
+    base_font: {google: "Inter"}
+    heading_font: {google: "Inter"}
+    code_font: {google: "JetBrains Mono"}
+
+navbar:
+  bg: primary
+  type: dark
+  structure:
+    left: [intro, reference]
+    right: [search, github]
+
+home:
+  title: "Tweedieverse: Differential Analysis of Omics Data with Tweedie Models"
+  description: >
+    One Tweedie framework for differential analysis of count and continuous
+    omics data, from microbiome and single-cell to bulk RNA-seq and
+    metabolomics.
+
+reference:
+  - title: "Differential analysis"
+    desc: "Fit Tweedie models feature by feature and summarise associations."
+    contents:
+      - Tweedieverse
+      - median_comparison_tweedie
+  - title: "Visualization"
+    contents:
+      - Tweedieverse_heatmap
+      - tweedie_theme
+  - title: "Utilities"
+    contents:
+      - tweedie_entropy

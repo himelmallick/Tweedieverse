@@ -42,7 +42,7 @@ Copyright: MaAsLin 3 median-comparison components are copyright 2025 Harvard
     See inst/COPYRIGHTS for the upstream notice.
 Encoding: UTF-8
 VignetteBuilder: knitr
-URL: https://github.com/himelmallick/Tweedieverse
+URL: https://himelmallick.github.io/Tweedieverse/, https://github.com/himelmallick/Tweedieverse
 BugReports: https://github.com/himelmallick/Tweedieverse/issues
 biocViews: DifferentialExpression, Software, Visualization, CellBasedAssays,
     ATACSeq, Microbiome, MassSpectrometry, SingleCell, Metabolomics,

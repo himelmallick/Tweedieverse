@@ -37,3 +37,6 @@
 
 # macOS metadata, at every directory level
 .DS_Store
+
+# pkgdown site (built and deployed by GitHub Actions)
+/docs/
